@@ -1,0 +1,5 @@
+*.min.css
+*.min.js
+*.swp
+*.swo
+js_deps.mk
