@@ -1,0 +1,30 @@
+html,
+body,
+.container-fluid {
+    height: 100%;
+}
+
+.split {
+    float: left;
+    height: 100%;
+}
+
+.gutter.gutter-horizontal {
+    height: 100%;
+    float: left;
+    background-color: #eee;
+    cursor: ew-resize;
+}
+
+.dependent-item {
+    margin-left: 20px;
+    overflow: hidden;
+}
+
+img-dir > .img-dir-title {
+    padding: 3px 6px;
+}
+
+#list {
+    overflow: auto;
+}

@@ -1,4 +1,43 @@
 /**
+ * @constructor
+ */
+function FolderItem() {}
+
+/**
+ * @type {string}
+ */
+FolderItem.prototype.name;
+
+/**
+ * @type {boolean}
+ */
+FolderItem.prototype.isDir;
+
+/**
+ * @constructor
+ */
+function FolderContent() {}
+
+/**
+ * @type {string}
+ */
+FolderContent.prototype.path;
+
+/**
+ * @type {Array<FolderItem>}
+ */
+FolderContent.prototype.items;
+
+/**
+ * @param {Array<string>} els
+ * @param {{sizes      : (Array<number>|undefined),
+ *          minSize    : (number|Array<number>|undefined),
+ *          direction  : (string|undefined),
+ *          gutterSize : (number|undefined)}} opts
+ */
+function Split(els, opts) {};
+
+/**
  * @param {!Element} el
  * @param {Object=} opts
  * @constructor

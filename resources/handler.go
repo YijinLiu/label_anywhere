@@ -4,6 +4,7 @@
 package resources
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -16,6 +17,7 @@ func Install(mux *http.ServeMux) {
 	for _, r := range []FileResource{
 		{"/css/bootstrap-3.3.7.min.css", "third_party/bootstrap-3.3.7.min.css", -1},
 		{"/css/font-awesome-4.6.2.css", "third_party/font_awesome_4.6.2/font-awesome.css", -1},
+
 		{"/font/fontawesome-webfont-v4.6.2.eot",
 			"third_party/font_awesome_4.6.2/fontawesome-webfont.eot", -1},
 		{"/font/fontawesome-webfont-v4.6.2.svg",
@@ -26,10 +28,13 @@ func Install(mux *http.ServeMux) {
 			"third_party/font_awesome_4.6.2/fontawesome-webfont.woff", -1},
 		{"/font/fontawesome-webfont-v4.6.2.woff2",
 			"third_party/font_awesome_4.6.2/fontawesome-webfont.woff2", -1},
+
 		{"/js/angularjs-1.6.4.min.js", "third_party/angularjs-1.6.4.min.js", -1},
 		{"/js/hammer-2.0.8.min.js", "third_party/hammer-2.0.8.min.js", -1},
-		{"/css/label.min.css", "label.min.css", -1},
-		{"/js/label.min.js", "label.min.js", -1},
+		{"/js/split-1.5.9.min.js", "third_party/split-1.5.9.min.js", -1},
+
+		{"/css/label.min.css." + Tag, "label.min.css", -1},
+		{"/js/label.min.js." + Tag, "label.min.js", -1},
 		{"/label.html", "label.html", -1},
 	} {
 		mux.Handle(r.ServingPath, NewHandler(r))
@@ -60,7 +65,8 @@ func NewHandler(fileRes FileResource) *Handler {
 	if maxAgeInSecs <= 0 {
 		maxAgeInSecs = MAX_CACHE_AGE_SECS
 	}
-	return &Handler{fileRes.ServingPath, content, guessContentType(fileRes.Path), maxAgeInSecs}
+	content = bytes.Replace(content, []byte("$(TAG)"), []byte(Tag), -1)
+	return &Handler{fileRes.ServingPath, content, GuessContentType(fileRes.Path), maxAgeInSecs}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +99,7 @@ var knownExts = map[string]string{
 	".png":  "image/png; charset=utf-8",
 }
 
-func guessContentType(fileName string) string {
+func GuessContentType(fileName string) string {
 	ext := filepath.Ext(fileName)
 	return knownExts[ext]
 }

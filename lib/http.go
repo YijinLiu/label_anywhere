@@ -1,36 +1,224 @@
 package lib
 
 import (
-	"context"
-	"crypto/tls"
-	"net"
+	"encoding/json"
+	"encoding/xml"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/YijinLiu/label_anywhere/resources"
+	"github.com/YijinLiu/logging"
 )
 
-type Server struct {
-	httpServer *http.Server
+type Handler struct {
+	mux  *http.ServeMux
+	root string
 }
 
-func NewServer(addr string, tlsCfg *tls.Config) (*Server, error) {
-	mux := http.NewServeMux()
-	resources.Install(mux)
-	httpServer := &http.Server{
-		Addr:    addr,
-		Handler: mux,
-	}
-
-	if listener, err := net.Listen("tcp", addr); err != nil {
+func NewHandler(root string) (*Handler, error) {
+	root, err := filepath.Abs(root)
+	if err != nil {
 		return nil, err
-	} else if tlsCfg != nil {
-		go httpServer.Serve(tls.NewListener(listener, tlsCfg))
-	} else {
-		go httpServer.Serve(listener)
 	}
-	return &Server{httpServer}, nil
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasSuffix(root, "/") {
+		root += "/"
+	}
+	mux := http.NewServeMux()
+	h := &Handler{mux, root}
+	resources.Install(mux)
+	mux.HandleFunc("/list_dir", h.ListDir)
+	mux.HandleFunc("/get_image", h.GetImage)
+	mux.HandleFunc("/get_ann", h.GetAnnotation)
+	mux.HandleFunc("/post_ann", h.PostAnnotation)
+	return h, nil
 }
 
-func (s *Server) Close() error {
-	return s.httpServer.Shutdown(context.Background())
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	logging.Vlog(3, r.URL.String())
+	h.mux.ServeHTTP(w, r)
+}
+
+func (h *Handler) ListDir(w http.ResponseWriter, r *http.Request) {
+	parent, name := r.FormValue("parent"), r.FormValue("name")
+	var absDir string
+	if parent == "" || name == "" {
+		absDir = h.root
+	} else {
+		var err error
+		absDir, err = filepath.EvalSymlinks(filepath.Join(h.root, parent, name))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		if !strings.HasPrefix(absDir, h.root) {
+			http.Error(w, "not authorized", http.StatusUnauthorized)
+			return
+		}
+	}
+	file, err := os.Open(absDir)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	defer file.Close()
+	fis, err := file.Readdir(0)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	var result FolderContent
+	result.Path = filepath.Join(parent, name)
+	if result.Path == "" {
+		result.Path = "/"
+	}
+	for _, fi := range fis {
+		if !fi.IsDir() && !fi.Mode().IsRegular() {
+			continue
+		}
+		result.Items = append(result.Items, FolderItem{
+			Name:  fi.Name(),
+			IsDir: fi.IsDir(),
+		})
+	}
+	if err := ReplyWithJson(result, w, r); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {
+	p := r.FormValue("path")
+	if p == "" {
+		http.Error(w, `missing parameter "path"`, http.StatusBadRequest)
+		return
+	}
+	p, err := filepath.EvalSymlinks(filepath.Join(h.root, p))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	if !strings.HasPrefix(p, h.root) {
+		http.Error(w, "not authorized", http.StatusUnauthorized)
+		return
+	}
+	if contentType := resources.GuessContentType(p); !strings.HasPrefix(contentType, "image/") {
+		http.Error(w, `not image`, http.StatusBadRequest)
+		return
+	}
+	http.ServeFile(w, r, p)
+}
+
+func (h *Handler) GetAnnotation(w http.ResponseWriter, r *http.Request) {
+	p := r.FormValue("path")
+	if p == "" {
+		http.Error(w, `missing parameter "path"`, http.StatusBadRequest)
+		return
+	}
+	p, err := filepath.EvalSymlinks(filepath.Join(h.root, p))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	if !strings.HasPrefix(p, h.root) {
+		http.Error(w, "not authorized", http.StatusUnauthorized)
+		return
+	}
+	if contentType := resources.GuessContentType(p); !strings.HasPrefix(contentType, "image/") {
+		http.Error(w, `not image`, http.StatusBadRequest)
+		return
+	}
+	var ann Annotation
+	xmlFile := strings.TrimSuffix(p, filepath.Ext(p)) + ".xml"
+	file, err := os.Open(xmlFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if f, err := os.Open(p); err != nil {
+				http.Error(w, err.Error(), http.StatusUnauthorized)
+				return
+			} else {
+				defer f.Close()
+				if img, _, err := image.Decode(f); err != nil {
+					http.Error(w, err.Error(), http.StatusUnauthorized)
+					return
+				} else {
+					ann.Filename = filepath.Base(p)
+					rect := img.Bounds()
+					ann.Size = &ImageSize{
+						Width:  uint32(rect.Max.X - rect.Min.X),
+						Height: uint32(rect.Max.Y - rect.Min.Y),
+						Depth:  3, // assume it's 3
+					}
+				}
+			}
+		} else {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+	} else {
+		defer file.Close()
+		xmlData, err := ioutil.ReadAll(file)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		if err := xml.Unmarshal(xmlData, &ann); err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+	}
+	if err := ReplyWithJson(&ann, w, r); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (h *Handler) PostAnnotation(w http.ResponseWriter, r *http.Request) {
+	p := r.FormValue("path")
+	if p == "" {
+		http.Error(w, `missing parameter "path"`, http.StatusBadRequest)
+		return
+	}
+	p, err := filepath.EvalSymlinks(filepath.Join(h.root, p))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	if !strings.HasPrefix(p, h.root) {
+		http.Error(w, "not authorized", http.StatusUnauthorized)
+		return
+	}
+	if contentType := resources.GuessContentType(p); !strings.HasPrefix(contentType, "image/") {
+		http.Error(w, `not image`, http.StatusBadRequest)
+		return
+	}
+
+	jsonData, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var ann Annotation
+	if err := json.Unmarshal(jsonData, &ann); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	xmlFile := strings.TrimSuffix(p, filepath.Ext(p)) + ".xml"
+	if len(ann.Objects) == 0 {
+		if err := os.Remove(xmlFile); err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+		}
+	} else if xmlData, err := xml.Marshal(&ann); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	} else if err := ioutil.WriteFile(xmlFile, xmlData, 0600); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
