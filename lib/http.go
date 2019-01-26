@@ -12,14 +12,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/YijinLiu/label_anywhere/resources"
 	"github.com/YijinLiu/logging"
 )
 
 type Handler struct {
-	mux  *http.ServeMux
-	root string
+	mux   *http.ServeMux
+	root  string
+	mu    sync.RWMutex
+	cache map[string]*FolderContent
 }
 
 func NewHandler(root string) (*Handler, error) {
@@ -35,7 +38,11 @@ func NewHandler(root string) (*Handler, error) {
 		root += "/"
 	}
 	mux := http.NewServeMux()
-	h := &Handler{mux, root}
+	h := &Handler{
+		mux:   mux,
+		root:  root,
+		cache: make(map[string]*FolderContent),
+	}
 	resources.Install(mux)
 	mux.HandleFunc("/list_dir", h.ListDir)
 	mux.HandleFunc("/get_image", h.GetImage)
@@ -66,22 +73,31 @@ func (h *Handler) ListDir(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	file, err := os.Open(absDir)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
+	dir := filepath.Join(parent, name)
+	if dir == "" {
+		dir = "/"
 	}
+	if content, err := h.listDir(dir, absDir, r.FormValue("refresh") != ""); err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+	} else if err := ReplyWithJson(content, w, r); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (h *Handler) listDir(dir, absDir string, refresh bool) (*FolderContent, error) {
+	if !refresh {
+		if content := h.cachedDir(dir); content != nil {
+			return content, nil
+		}
+	}
+	file, err := os.Open(absDir)
 	defer file.Close()
 	fis, err := file.Readdir(0)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
+		return nil, err
 	}
 	var result FolderContent
-	result.Path = filepath.Join(parent, name)
-	if result.Path == "" {
-		result.Path = "/"
-	}
+	result.Path = dir
 	for _, fi := range fis {
 		if !fi.IsDir() && !fi.Mode().IsRegular() {
 			continue
@@ -91,18 +107,25 @@ func (h *Handler) ListDir(w http.ResponseWriter, r *http.Request) {
 			IsDir: fi.IsDir(),
 		})
 	}
-	if err := ReplyWithJson(result, w, r); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	h.mu.Lock()
+	h.cache[dir] = &result
+	h.mu.Unlock()
+	return &result, nil
+}
+
+func (h *Handler) cachedDir(dir string) *FolderContent {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.cache[dir]
 }
 
 func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {
-	p := r.FormValue("path")
-	if p == "" {
-		http.Error(w, `missing parameter "path"`, http.StatusBadRequest)
+	parent, name := r.FormValue("parent"), r.FormValue("name")
+	if parent == "" || name == "" {
+		http.Error(w, `missing parameter "parent" or "name"`, http.StatusBadRequest)
 		return
 	}
-	p, err := filepath.EvalSymlinks(filepath.Join(h.root, p))
+	p, err := filepath.EvalSymlinks(filepath.Join(h.root, parent, name))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return

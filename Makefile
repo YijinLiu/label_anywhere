@@ -26,11 +26,14 @@ distclean: clean
 $(ROOT_DIR)/src/github.com/YijinLiu/logging:
 	cd $(ROOT_DIR) ; $(GO) get github.com/YijinLiu/logging
 
+$(ROOT_DIR)/src/github.com/jteeuwen/go-bindata:
+	cd $(ROOT_DIR) ; $(GO) get github.com/jteeuwen/go-bindata
+
 $(ROOT_DIR)/src/github.com/stretchr/testify:
 	cd $(ROOT_DIR) ; $(GO) get github.com/stretchr/testify
 
 GO_BINDATA:=$(BIN_DIR)/go-bindata
-$(GO_BINDATA):
+$(GO_BINDATA): $(ROOT_DIR)/src/github.com/jteeuwen/go-bindata
 	cd $(ROOT_DIR) ; $(GO) install github.com/jteeuwen/go-bindata/go-bindata
 
 $(RES_DIR)/tag.go: $(RES_DIR)/label.css \
@@ -69,11 +72,10 @@ $(RES_DIR)/js_deps.mk: $(JS_SRCS) $(GEN_JS_DEPS)
 
 -include $(RES_DIR)/js_deps.mk
 
-CLOSURE_COMPILER_VERSION:=20170409
-CLOSURE_COMPILER:=$(BUILD_TOOLS_DIR)/closure-compiler-v$(CLOSURE_COMPILER_VERSION).jar
+CLOSURE_COMPILER:=$(BUILD_TOOLS_DIR)/closure-compiler-v20170409.jar
 $(CLOSURE_COMPILER):
 	mkdir -p $(BUILD_TOOLS_DIR)
-	cd $(BUILD_TOOLS_DIR) ; wget -O - https://dl.google.com/closure-compiler/compiler-$(CLOSURE_COMPILER_VERSION).tar.gz | tar xz $(notdir $@)
+	wget -O $@ "https://drive.google.com/uc?export=download&id=1kAnWk5_4xZNCYPcUVSEbkw_CikH9Hqv0"
 
 JS_COMPILATION_LEVEL?=ADVANCED
 
