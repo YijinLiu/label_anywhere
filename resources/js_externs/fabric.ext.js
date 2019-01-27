@@ -9,9 +9,24 @@ var fabric = {};
 fabric.Object = function() {};
 
 /**
- * @return {!number}
+ * @type {string}
  */
-fabric.Object.prototype.complexity = function() {};
+fabric.Object.prototype.fill;
+
+/**
+ * @type {!boolean}
+ */
+fabric.Object.prototype.hasBorders;
+
+/**
+ * @type {!boolean}
+ */
+fabric.Object.prototype.hasControls;
+
+/**
+ * @type {!boolean}
+ */
+fabric.Object.prototype.hasRotatingPoint;
 
 /**
  * @type {!number}
@@ -19,23 +34,73 @@ fabric.Object.prototype.complexity = function() {};
 fabric.Object.prototype.height;
 
 /**
+ * @type {!number}
+ */
+fabric.Object.prototype.left;
+
+/**
+ * @type {!boolean}
+ */
+fabric.Object.prototype.lockRotation;
+
+/**
+ * @type {!boolean}
+ */
+fabric.Object.prototype.lockUniScaling;
+
+/**
+ * @type {!number}
+ */
+fabric.Object.prototype.opacity;
+
+/**
+ * @type {!number}
+ */
+fabric.Object.prototype.right;
+
+/**
+ * @type {!boolean}
+ */
+fabric.Object.prototype.selectable;
+
+/**
+ * @type {string}
+ */
+fabric.Object.prototype.stroke;
+
+/**
+ * @type {number}
+ */
+fabric.Object.prototype.strokeWidth;
+
+/**
+ * @type {!number}
+ */
+fabric.Object.prototype.width;
+
+/**
+ * @return {!number}
+ */
+fabric.Object.prototype.complexity = function() {};
+
+/**
  * @constructor
  */
-fabric.Option = function() {};
+fabric.Event = function() {};
 
 /**
  * @type {Event|MouseEvent|TouchEvent}
  */
-fabric.Option.prototype.e;
+fabric.Event.prototype.e;
 
 /**
  * @type {fabric.Object}
  */
-fabric.Option.prototype.target;
+fabric.Event.prototype.target;
 
 /**
  * @param {!string} evt
- * @param {function(!fabric.Option)} cb
+ * @param {function(!fabric.Event)} cb
  */
 fabric.Object.prototype.on = function(evt, cb) {};
 
@@ -43,6 +108,19 @@ fabric.Object.prototype.on = function(evt, cb) {};
  * @param {!CanvasRenderingContext2D} ctx
  */
 fabric.Object.prototype.render = function(ctx) {};
+
+/**
+ * @param {{bl: boolean,
+ *          br: boolean,
+ *          ml: boolean,
+ *          mt: boolean,
+ *          mr: boolean,
+ *          mb: boolean,
+ *          mtr: boolean,
+ *          tl: boolean,
+ *          tr: boolean}} opt
+ */
+fabric.Object.prototype.setControlsVisibility = function(opt) {};
 
 /**
  * @param {{format: (string|undefined),
@@ -70,11 +148,6 @@ fabric.Object.prototype.toString = function() {};
  * @return {!string}
  */
 fabric.Object.prototype.toSVG = function() {};
-
-/**
- * @type {!number}
- */
-fabric.Object.prototype.width;
 
 /**
  * @constructor
@@ -174,6 +247,16 @@ fabric.Point = function() {};
 fabric.Polygon = function() {};
 
 /**
+ * @param {{width: number,
+ *          height: number,
+ *          left: number,
+ *          top: number}} opt
+ * @constructor
+ * @extends {fabric.Object}
+ */
+fabric.Rect = function(opt) {};
+
+/**
  * @constructor
  * @extends {fabric.Object}
  */
@@ -183,19 +266,21 @@ fabric.Shadow = function() {};
  * @constructor
  * @extends {fabric.Object}
  */
-fabric.Rect = function() {};
-
-/**
- * @constructor
- * @extends {fabric.Object}
- */
 fabric.Triangle = function() {};
 
 /**
+ * @param {!string} text
+ * @param {{fontFamily: (string|undefined),
+ *          fontSize: (number|undefined),
+ *          fontStyle: (number|undefined),
+ *          fontWeight: (string|undefined),
+ *          shadow: (string|undefined),
+ *          left: (number|undefined),
+ *          top: (number|undefined)}} opt
  * @constructor
  * @extends {fabric.Object}
  */
-fabric.Text = function() {};
+fabric.Text = function(text, opt) {};
 
 /**
  * @constructor
@@ -232,6 +317,19 @@ fabric.SprayBrush = function() {};
  * @extends {fabric.Object}
  */
 fabric.StaticCanvas = function() {};
+
+/**
+ * @param {...fabric.Object} objs
+ */
+fabric.StaticCanvas.prototype.add = function(objs) {};
+
+fabric.StaticCanvas.prototype.clear = function() {};
+
+/**
+ * @param {string=} opt
+ * @return {!Array<!fabric.Object>}
+ */
+fabric.StaticCanvas.prototype.getObjects = function(opt) {};
 
 fabric.StaticCanvas.prototype.renderAll = function() {};
 

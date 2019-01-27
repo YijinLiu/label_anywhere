@@ -31,6 +31,10 @@ body,
     padding: 3px 6px;
 }
 
+.annotated {
+    background: lightgreen;
+}
+
 #list {
     overflow: auto;
     width: calc(30% - 2px);

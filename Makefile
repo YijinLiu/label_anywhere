@@ -14,6 +14,7 @@ $(BIN_DIR)/label_anywhere: $(RES_DIR)/handler.go \
                            $(RES_DIR)/resources.go \
                            $(RES_DIR)/tag.go \
                            $(SRC_DIR)/lib/http.go \
+                           $(SRC_DIR)/lib/schema.go \
                            $(SRC_DIR)/main.go
 	cd $(ROOT_DIR) ; $(GO) install github.com/YijinLiu/label_anywhere
 

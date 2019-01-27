@@ -195,7 +195,9 @@ label.App.directive('imgDir', function() {
         <img-dir parent="c.${content}.path" name="item.name" is-collapsed="true" ng-if="item.isDir">
         </img-dir>
         <span class="img-dir-title">
-            <a href="#" ng-click="c.${open}(item.name)" ng-if="!item.isDir" class="name">
+            <a href="#" ng-click="c.${open}(item.name)" ng-if="!item.isDir"
+                        ng-attr-title="{{item.objects}}" class="name"
+                        ng-class="{'annotated' : item.objects && item.objects.length > 0}">
                 {{item.name}}
             </a>
             <a role="button" class="btn btn-sm" ng-click="c.${del}(item.name)" ng-if="!item.isDir">
@@ -238,13 +240,18 @@ label.LabelImgController = function($scope, $route, $http, $element) {
     this.height_ = Math.floor(ctnEl.clientHeight);
     this.canvas_ = new fabric.Canvas(ctnEl.querySelector('canvas'));
     this.canvas_.on('mouse:wheel', this.onWheel_.bind(this));
+    this.parent_ = '';
+    this.name_ = '';
     /** @type {fabric.Image} */
     this.img_;
+    /** @type {Annotation} */
+    this.ann_;
+    this.scale_ = 1;
     label.labelImg_ = this;
 };
 
 /**
- * @param {!fabric.Option} opt
+ * @param {!fabric.Event} opt
  */
 label.LabelImgController.prototype.onWheel_ = function(opt) {
     const evt = /** @type {MouseEvent} */ (opt.e)
@@ -264,6 +271,11 @@ label.LabelImgController.prototype.onWheel_ = function(opt) {
  * @param {!string} name
  */
 label.LabelImgController.prototype.load_ = function(parent, name) {
+    this.canvas_.clear();
+    this.img_ = null;
+    this.ann_ = null;
+    this.parent_ = parent;
+    this.name_ = name;
     const url = goog.string.format(
         'get_img?parent=%s&name=%s', encodeURIComponent(parent), encodeURIComponent(name));
     fabric.Image.fromURL(url, this.onLoad_.bind(this));
@@ -274,33 +286,78 @@ label.LabelImgController.prototype.load_ = function(parent, name) {
  */
 label.LabelImgController.prototype.onLoad_ = function(img) {
     this.img_ = img;
-    let width = img.width;
-    let height = img.height;
-    const ar = width / height;
-    if (width > this.width_) {
-        width = this.width_;
-        height = Math.floor(width / ar);
-    }
-    if (height > this.height_) {
-        height = this.height_;
-        width = Math.floor(height * ar);
-    }
-    this.resizeCanvas_(width, height);
+    let scale = 1;
+    if (img.width > this.width_) scale = this.width_ / img.width;
+    if (img.height * scale > this.height_) scale = this.height_ / img.height;
+    this.scaleCanvas_(scale);
+    const url = goog.string.format('get_ann?parent=%s&name=%s', encodeURIComponent(this.parent_),
+                                   encodeURIComponent(this.name_));
+    this.http_.get(url).then(this.gotAnn_.bind(this), this.getAnnFailed_.bind(this));
 };
 
 /**
- * @param {!number} width
- * @param {!number} height
+ * @param {angular.$http.Response} resp
  */
-label.LabelImgController.prototype.resizeCanvas_ = function(width, height) {
-    this.canvas_.setWidth(width);
-    this.canvas_.setHeight(height);
+label.LabelImgController.prototype.gotAnn_ = function(resp) {
+    this.ann_ = resp.data;
+    if (!this.ann_.objects) this.ann_.objects = [];
+    this.renderAnn_();
+};
+
+label.LabelImgController.prototype.renderAnn_ = function() {
+    if (!this.ann_) return;
+    for (let i = 0; i < this.ann_.objects.length; i++) {
+        const obj = this.ann_.objects[i];
+        const rect = new fabric.Rect({
+            left: Math.floor(obj.bndbox.xmin * this.scale_),
+            top: Math.floor(obj.bndbox.ymin * this.scale_),
+            width: Math.floor((obj.bndbox.xmax - obj.bndbox.xmin) * this.scale_),
+            height: Math.floor((obj.bndbox.ymax - obj.bndbox.ymin) * this.scale_)
+        });
+        rect.fill = 'beige';
+        rect.opacity = 0.4;
+        rect.hasBorders = false;
+        rect.hasRotatingPoint = false;
+        rect.stroke = 'bisque';
+        rect.strokeWidth = 2;
+        const text = new fabric.Text(obj.name, {
+            left: rect.left + 3,
+            top: rect.top + 3,
+            fontSize: 20,
+            fontWeight: 'bold',
+            shadow: 'rgba(0,0,0,0.3) 5px 5px 5px'
+        });
+        text.fill = 'palegreen';
+        text.hasBorders = false;
+        text.hasControls = false;
+        text.selectable = false;
+        this.canvas_.add(rect, text);
+    }
+    this.canvas_.renderAll();
+};
+
+/**
+ * @param {angular.$http.Response} resp
+ */
+label.LabelImgController.prototype.getAnnFailed_ = function(resp) {
+    alert(goog.string.format('failed to load annotation for "%s"!', this.name_));
+};
+
+/**
+ * @param {!number} scale
+ */
+label.LabelImgController.prototype.scaleCanvas_ = function(scale) {
+    this.scale_ = scale;
+    this.canvas_.clear();
+    this.canvas_.setWidth(Math.floor(this.img_.width * scale));
+    this.canvas_.setHeight(Math.floor(this.img_.height * scale));
     this.canvas_.setBackgroundImage(
         this.img_, this.canvas_.renderAll.bind(this.canvas_),
         { originX: 'left',
           originY: 'top',
-          scaleX: width / this.img_.width,
-          scaleY: height / this.img_.height });
+          scaleX: scale,
+          scaleY: scale });
+    this.renderAnn_();
     this.updateZooming_();
 };
 
@@ -313,43 +370,27 @@ label.LabelImgController.prototype.updateZooming_ = function() {
 };
 
 /**
- * @param {number} scale
+ * @param {number} times
  */
-label.LabelImgController.prototype.zoomIn_ = function(scale) {
+label.LabelImgController.prototype.zoomIn_ = function(times) {
     if (!this.canZoomIn_) return;
-    let width = Math.floor(this.canvas_.width * scale);
-    let height = Math.floor(this.canvas_.height * scale);
-    const ar = this.img_.width / this.img_.height;
-    if (width > this.width_) {
-        width = this.width_;
-        height = width / ar;
-    }
-    if (height > this.height_) {
-        height = this.height_;
-        width = height * ar;
-    }
-    this.resizeCanvas_(width, height);
+    let scale = this.scale_ * times;
+    if (this.img_.width * scale > this.width_) scale = this.width_ / this.img_.width;
+    if (this.img_.width * scale > this.height_) scale = this.height_ / this.img_.height;
+    this.scaleCanvas_(scale);
 };
 
 /**
- * @param {number} scale
+ * @param {number} times
  */
-label.LabelImgController.prototype.zoomOut_ = function(scale) {
+label.LabelImgController.prototype.zoomOut_ = function(times) {
     if (!this.canZoomOut_) return;
-    let width = Math.floor(this.canvas_.width * scale);
-    let height = Math.floor(this.canvas_.height * scale);
-    const ar = this.img_.width / this.img_.height;
+    let scale = this.scale_ * times;
     const minWidth = Math.min(this.img_.width, 300);
-    if (width < minWidth) {
-        width = minWidth;
-        height = width / ar;
-    }
+    if (this.img_.width * scale < minWidth) scale = minWidth / this.img_.width;
     const minHeight = Math.min(this.img_.height, 300);
-    if (height < minHeight) {
-        height = minHeight;
-        width = height * ar;
-    }
-    this.resizeCanvas_(width, height);
+    if (this.img_.height * scale < minHeight) scale = minHeight / this.img_.height;
+    this.scaleCanvas_(scale);
 };
 
 label.App.directive('labelImg', function() {

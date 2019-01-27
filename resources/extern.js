@@ -29,13 +29,84 @@ FolderContent.prototype.path;
 FolderContent.prototype.items;
 
 /**
- * @param {Array<string>} els
- * @param {{sizes      : (Array<number>|undefined),
- *          minSize    : (number|Array<number>|undefined),
- *          direction  : (string|undefined),
- *          gutterSize : (number|undefined)}} opts
+ * @constructor
  */
-function Split(els, opts) {};
+function BoundingBox() {}
+
+/**
+ * @type {!number}
+ */
+BoundingBox.prototype.xmin;
+
+/**
+ * @type {!number}
+ */
+BoundingBox.prototype.ymin;
+
+/**
+ * @type {!number}
+ */
+BoundingBox.prototype.xmax;
+
+/**
+ * @type {!number}
+ */
+BoundingBox.prototype.ymax;
+
+/**
+ * @constructor
+ */
+function Obj() {}
+
+/**
+ * @type {!string}
+ */
+Obj.prototype.name;
+
+/**
+ * @type {!BoundingBox}
+ */
+Obj.prototype.bndbox;
+
+/**
+ * @constructor
+ */
+function ImageSize() {}
+
+/**
+ * @type {!number}
+ */
+ImageSize.prototype.width;
+
+/**
+ * @type {!number}
+ */
+ImageSize.prototype.height;
+
+/**
+ * @type {!number}
+ */
+ImageSize.prototype.depth;
+
+/**
+ * @constructor
+ */
+function Annotation() {}
+
+/**
+ * @type {!string}
+ */
+Annotation.prototype.filename;
+
+/**
+ * @type {!ImageSize}
+ */
+Annotation.prototype.size;
+
+/**
+ * @type {Array<!Obj>}
+ */
+Annotation.prototype.objects;
 
 /**
  * @param {!Element} el

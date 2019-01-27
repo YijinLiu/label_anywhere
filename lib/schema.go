@@ -15,8 +15,9 @@ const (
 )
 
 type FolderItem struct {
-	Name  string `json:"name"`
-	IsDir bool   `json:"isDir"`
+	Name    string   `json:"name"`
+	IsDir   bool     `json:"isDir"`
+	Objects []string `json:"objects"`
 }
 
 type FolderContent struct {
@@ -46,7 +47,7 @@ type Annotation struct {
 	XMLName  xml.Name   `xml:"annotation"`
 	Filename string     `json:"filename" xml:"filename"`
 	Size     *ImageSize `json:"size,omitempty" xml:"size,omitempty"`
-	Objects  []*Object  `json:"object,omitempty" xml:"object,omitempty"`
+	Objects  []*Object  `json:"objects,omitempty" xml:"object,omitempty"`
 }
 
 type JsonError struct {
