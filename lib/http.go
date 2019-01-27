@@ -44,9 +44,10 @@ func NewHandler(root string) (*Handler, error) {
 		cache: make(map[string]*FolderContent),
 	}
 	resources.Install(mux)
-	mux.HandleFunc("/list_dir", h.ListDir)
-	mux.HandleFunc("/get_image", h.GetImage)
+	mux.HandleFunc("/del_img", h.DelImage)
 	mux.HandleFunc("/get_ann", h.GetAnnotation)
+	mux.HandleFunc("/get_img", h.GetImage)
+	mux.HandleFunc("/list_dir", h.ListDir)
 	mux.HandleFunc("/post_ann", h.PostAnnotation)
 	return h, nil
 }
@@ -99,7 +100,7 @@ func (h *Handler) listDir(dir, absDir string, refresh bool) (*FolderContent, err
 	var result FolderContent
 	result.Path = dir
 	for _, fi := range fis {
-		if !fi.IsDir() && !fi.Mode().IsRegular() {
+		if !fi.IsDir() && (!fi.Mode().IsRegular() && !isImageFile(fi.Name())) {
 			continue
 		}
 		result.Items = append(result.Items, FolderItem{
@@ -134,11 +135,50 @@ func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not authorized", http.StatusUnauthorized)
 		return
 	}
-	if contentType := resources.GuessContentType(p); !strings.HasPrefix(contentType, "image/") {
+	if !isImageFile(p) {
 		http.Error(w, `not image`, http.StatusBadRequest)
 		return
 	}
 	http.ServeFile(w, r, p)
+}
+
+func (h *Handler) DelImage(w http.ResponseWriter, r *http.Request) {
+	parent, name := r.FormValue("parent"), r.FormValue("name")
+	if parent == "" || name == "" {
+		http.Error(w, `missing parameter "parent" or "name"`, http.StatusBadRequest)
+		return
+	}
+	p, err := filepath.EvalSymlinks(filepath.Join(h.root, parent, name))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	if !strings.HasPrefix(p, h.root) {
+		http.Error(w, "not authorized", http.StatusUnauthorized)
+		return
+	}
+	if err := delFile(p); err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	if err := delFile(annotationXmlFile(p)); err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if content := h.cache[parent]; content != nil {
+		for i, item := range content.Items {
+			if item.Name == name {
+				l := len(content.Items) - 1
+				for j := i; j < l; j++ {
+					content.Items[j] = content.Items[j+1]
+				}
+				content.Items = content.Items[:l]
+				break
+			}
+		}
+	}
 }
 
 func (h *Handler) GetAnnotation(w http.ResponseWriter, r *http.Request) {
@@ -156,12 +196,12 @@ func (h *Handler) GetAnnotation(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not authorized", http.StatusUnauthorized)
 		return
 	}
-	if contentType := resources.GuessContentType(p); !strings.HasPrefix(contentType, "image/") {
+	if !isImageFile(p) {
 		http.Error(w, `not image`, http.StatusBadRequest)
 		return
 	}
 	var ann Annotation
-	xmlFile := strings.TrimSuffix(p, filepath.Ext(p)) + ".xml"
+	xmlFile := annotationXmlFile(p)
 	file, err := os.Open(xmlFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -219,7 +259,7 @@ func (h *Handler) PostAnnotation(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not authorized", http.StatusUnauthorized)
 		return
 	}
-	if contentType := resources.GuessContentType(p); !strings.HasPrefix(contentType, "image/") {
+	if !isImageFile(p) {
 		http.Error(w, `not image`, http.StatusBadRequest)
 		return
 	}
@@ -234,7 +274,7 @@ func (h *Handler) PostAnnotation(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	xmlFile := strings.TrimSuffix(p, filepath.Ext(p)) + ".xml"
+	xmlFile := annotationXmlFile(p)
 	if len(ann.Objects) == 0 {
 		if err := os.Remove(xmlFile); err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -244,4 +284,20 @@ func (h *Handler) PostAnnotation(w http.ResponseWriter, r *http.Request) {
 	} else if err := ioutil.WriteFile(xmlFile, xmlData, 0600); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func annotationXmlFile(imgFile string) string {
+	return strings.TrimSuffix(imgFile, filepath.Ext(imgFile)) + ".xml"
+}
+
+func delFile(file string) error {
+	return os.Rename(file, file+".deleted")
+}
+
+func isImageFile(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".jpeg", ".jpg", ".png", ".gif":
+		return true
+	}
+	return false
 }

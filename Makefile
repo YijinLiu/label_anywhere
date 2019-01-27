@@ -36,7 +36,8 @@ GO_BINDATA:=$(BIN_DIR)/go-bindata
 $(GO_BINDATA): $(ROOT_DIR)/src/github.com/jteeuwen/go-bindata
 	cd $(ROOT_DIR) ; $(GO) install github.com/jteeuwen/go-bindata/go-bindata
 
-$(RES_DIR)/tag.go: $(RES_DIR)/label.css \
+$(RES_DIR)/tag.go: $(RES_DIR)/draggable.js \
+                   $(RES_DIR)/label.css \
                    $(RES_DIR)/label.js
 	@ echo -e "\e[0;92mGenerating $@\e[0m ..."
 	@ tar c $^ 2>/dev/null | md5sum -b | sed -E 's/^(\S*) .*$$/package resources\nconst Tag = "\1"/' > $@
@@ -46,9 +47,9 @@ $(RES_DIR)/resources.go: $(RES_DIR)/label.html \
                          $(RES_DIR)/label.min.css \
                          $(RES_DIR)/third_party/angularjs-1.6.4.min.js \
                          $(RES_DIR)/third_party/bootstrap-3.3.7.min.css \
+                         $(RES_DIR)/third_party/fabric-2.4.6.min.js \
                          $(RES_DIR)/third_party/font_awesome_4.6.2 \
-                         $(RES_DIR)/third_party/hammer-2.0.8.min.js \
-                         $(RES_DIR)/third_party/split-1.5.9.min.js | $(GO_BINDATA)
+                         $(RES_DIR)/third_party/hammer-2.0.8.min.js | $(GO_BINDATA)
 	cd $(RES_DIR) ; $(GO_BINDATA) -o $@ -pkg=resources -prefix=$(RES_DIR) $^
 
 
@@ -60,11 +61,15 @@ $(GEN_JS_DEPS): $(ROOT_DIR)/src/github.com/YijinLiu/label_anywhere/resources/gen
 
 CLOSURE_LIBRARY_DIR:=/usr/local/closure-library/v20170409
 CLOSURE_JS_SRCS:=$(CLOSURE_LIBRARY_DIR)/closure/goog/base.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/labs/useragent/device.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/labs/useragent/util.js \
                  $(CLOSURE_LIBRARY_DIR)/closure/goog/reflect/reflect.js \
                  $(CLOSURE_LIBRARY_DIR)/closure/goog/string/string.js \
                  $(CLOSURE_LIBRARY_DIR)/closure/goog/string/stringformat.js
 
-JS_SRCS:=$(RES_DIR)/label.js $(CLOSURE_JS_SRCS)
+JS_SRCS:=$(RES_DIR)/draggable.js \
+         $(RES_DIR)/label.js \
+         $(CLOSURE_JS_SRCS)
 
 $(RES_DIR)/js_deps.mk: $(JS_SRCS) $(GEN_JS_DEPS)
 	@ echo -e "\e[0;92mGenerating $@\e[0m ..."
@@ -90,6 +95,7 @@ $(RES_DIR)/%.min.js: $(RES_DIR)/%.js $(RES_DIR)/extern.js | $(CLOSURE_COMPILER)
 	    --externs=$(RES_DIR)/js_externs/angular-1.5-q_templated.js \
 	    --externs=$(RES_DIR)/js_externs/angular-1.5.js \
 	    --externs=$(RES_DIR)/js_externs/angular_ui_router.js \
+	    --externs=$(RES_DIR)/js_externs/fabric.ext.js \
 	    --externs=$(RES_DIR)/js_externs/ui-bootstrap.js \
 	    --process_closure_primitives \
 	    --output_wrapper="(function(){%output%})();" \

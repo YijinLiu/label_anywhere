@@ -30,8 +30,8 @@ func Install(mux *http.ServeMux) {
 			"third_party/font_awesome_4.6.2/fontawesome-webfont.woff2", -1},
 
 		{"/js/angularjs-1.6.4.min.js", "third_party/angularjs-1.6.4.min.js", -1},
+		{"/js/fabric-2.4.6.min.js", "third_party/fabric-2.4.6.min.js", -1},
 		{"/js/hammer-2.0.8.min.js", "third_party/hammer-2.0.8.min.js", -1},
-		{"/js/split-1.5.9.min.js", "third_party/split-1.5.9.min.js", -1},
 
 		{"/css/label.min.css." + Tag, "label.min.css", -1},
 		{"/js/label.min.js." + Tag, "label.min.js", -1},

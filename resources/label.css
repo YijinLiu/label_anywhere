@@ -1,15 +1,18 @@
 html,
 body,
 .container-fluid {
+    position: relative;
     height: 100%;
+    overflow: hidden;
 }
 
-.split {
+.split-view {
     float: left;
     height: 100%;
 }
 
-.gutter.gutter-horizontal {
+.splitter {
+    width: 5px;
     height: 100%;
     float: left;
     background-color: #eee;
@@ -18,13 +21,46 @@ body,
 
 .dependent-item {
     margin-left: 20px;
-    overflow: hidden;
 }
 
-img-dir > .img-dir-title {
+.img-dir-title {
+    white-space: nowrap;
+}
+
+.img-dir-title > .btn {
     padding: 3px 6px;
 }
 
 #list {
     overflow: auto;
+    width: calc(30% - 2px);
+}
+
+#list .name {
+    text-overflow: ellipsis;
+}
+
+#image {
+    position: relative;
+    width: calc(70% - 3px);
+}
+
+label-img {
+    display: block;
+    height: 100%;
+    overflow: hidden;
+}
+
+label-img-tb {
+    position: absolute;
+    background-color: #eee;
+    top: 0;
+    left: 2px;
+    padding: 2px 5px;
+    cursor: all-scroll;
+}
+
+label-img-tb > .btn {
+    padding: 0 3px;
+    margin: 0 3px;
 }
