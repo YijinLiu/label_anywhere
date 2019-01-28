@@ -86,7 +86,7 @@ label-img-tb > .btn {
     display: flex;
     flex-flow: column;
     min-height: 280px !important;
-    max-height: calc(100% - 150px);
+    max-height: calc(100% - 50px);
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -101,4 +101,40 @@ label-img-tb > .btn {
 .modal-body > ul {
     overflow-x: hidden;
     overflow-y: auto;
+}
+
+@media screen and (orientation:landscape) {
+    .modal-body > ul {
+        columns: 3;
+        -webkit-columns: 3;
+        -moz-columns: 3;
+    }
+}
+
+.form-control-feedback {
+    left: 0;
+}
+
+.form-control-feedback.fa {
+    display: block;
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+}
+
+.has-feedback-left .form-control {
+    padding-right: 12px;
+    padding-left: 28px;
+}
+
+li > .form-group {
+    margin: 0;
+    display: inline-block;
+    width: 80%;
+}
+
+li > .form-group > input {
+    padding-top: 0;
+    padding-bottom: 0;
+    height: 28px;
 }

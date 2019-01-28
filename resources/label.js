@@ -76,8 +76,7 @@ label.Controller.prototype.imgDirCreated_ = function(ctl) {
  */
 function scrollIntoViewIfNeeded(el) {
     const rect = el.getBoundingClientRect();
-    if (rect.top < 0 || rect.left < 0 ||
-        rect.right > (window.innerWidth || document.documentElement.clientWidth) ||
+    if (rect.top < 0 ||
         rect.bottom > (window.innerHeight || document.documentElement.clientHeight)) {
         el.scrollIntoView();
     }
@@ -565,8 +564,7 @@ label.LabelImgController.prototype.onObjMoving_ = function(opt) {
  */
 label.LabelImgController.prototype.onLoad_ = function(img) {
     this.img_ = img;
-    let scale = 1;
-    if (img.width > this.width_) scale = this.width_ / img.width;
+    let scale = this.width_ / img.width;
     if (img.height * scale > this.height_) scale = this.height_ / img.height;
     this.scaleCanvas_(scale);
     const url = goog.string.format('get_ann?parent=%s&name=%s', encodeURIComponent(this.parent_),
@@ -723,7 +721,13 @@ label.LabelImgController.prototype.selectObjName_ = function(cb) {
 </div>
 <div class="modal-body" id="modal-body">
 	<ul>
-		<li ng-repeat="name in c.${names}">
+        <li><div class="form-group has-feedback has-feedback-left"
+            ng-class="{'has-warning' : names.length == 0}">
+            <input type="text" ng-model="search" class="form-control"
+                    ng-click="$event.stopPropagation()">
+            <i class="form-control-feedback fa fa-search"></i>
+        </div></li>
+		<li ng-repeat="name in names = (c.${names}|filter:search:strict)">
 			<a href="#" ng-click="$event.preventDefault(); c.${done}(name); c.${close}()">
                 {{name}}
             </a>
@@ -740,7 +744,6 @@ label.LabelImgController.prototype.selectObjName_ = function(cb) {
     this.modal_.open({
         animation: true,
         template: tpl,
-        size: 'sm',
         controller: label.SelectObjController,
         controllerAs: 'c',
         resolve: {
