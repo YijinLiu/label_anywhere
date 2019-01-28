@@ -22,11 +22,12 @@ import (
 type Handler struct {
 	mux   *http.ServeMux
 	root  string
+	objs  []string
 	mu    sync.RWMutex
 	cache map[string]*FolderContent
 }
 
-func NewHandler(root string) (*Handler, error) {
+func NewHandler(root string, objs []string) (*Handler, error) {
 	root, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -39,9 +40,13 @@ func NewHandler(root string) (*Handler, error) {
 		root += "/"
 	}
 	mux := http.NewServeMux()
+	if len(objs) == 0 {
+		objs = []string{"person", "car"}
+	}
 	h := &Handler{
 		mux:   mux,
 		root:  root,
+		objs:  objs,
 		cache: make(map[string]*FolderContent),
 	}
 	resources.Install(mux)
@@ -49,6 +54,7 @@ func NewHandler(root string) (*Handler, error) {
 	mux.HandleFunc("/get_ann", h.GetAnnotation)
 	mux.HandleFunc("/get_img", h.GetImage)
 	mux.HandleFunc("/list_dir", h.ListDir)
+	mux.HandleFunc("/list_objs", h.ListObjs)
 	mux.HandleFunc("/post_ann", h.PostAnnotation)
 	return h, nil
 }
@@ -86,53 +92,6 @@ func (h *Handler) ListDir(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) listDir(dir, absDir string, refresh bool) (*FolderContent, error) {
-	if !refresh {
-		if content := h.cachedDir(dir); content != nil {
-			return content, nil
-		}
-	}
-	file, err := os.Open(absDir)
-	defer file.Close()
-	fis, err := file.Readdir(0)
-	if err != nil {
-		return nil, err
-	}
-	var result FolderContent
-	result.Path = dir
-	for _, fi := range fis {
-		var objects []string
-		if !fi.IsDir() {
-			if !fi.Mode().IsRegular() || !isImageFile(fi.Name()) {
-				continue
-			}
-			if ann, err := readAnnotationXmlFile(
-				annotationXmlFile(filepath.Join(absDir, fi.Name()))); err != nil {
-				if !os.IsNotExist(err) {
-					logging.Vlog(0, err)
-				}
-			} else {
-				objects = uniqueObjectNames(ann.Objects)
-			}
-		}
-		result.Items = append(result.Items, FolderItem{
-			Name:    fi.Name(),
-			IsDir:   fi.IsDir(),
-			Objects: objects,
-		})
-	}
-	h.mu.Lock()
-	h.cache[dir] = &result
-	h.mu.Unlock()
-	return &result, nil
-}
-
-func (h *Handler) cachedDir(dir string) *FolderContent {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.cache[dir]
-}
-
 func (h *Handler) GetImage(w http.ResponseWriter, r *http.Request) {
 	if p := h.getImagePath(w, r); p != "" {
 		http.ServeFile(w, r, p)
@@ -159,13 +118,11 @@ func (h *Handler) GetAnnotation(w http.ResponseWriter, r *http.Request) {
 		var err error
 		if ann, err = readAnnotationXmlFile(annotationXmlFile(p)); err != nil {
 			if os.IsNotExist(err) {
-				if f, nerr := os.Open(p); nerr != nil {
-					err = nerr
-				} else {
+				var f *os.File
+				if f, err = os.Open(p); err == nil {
 					defer f.Close()
-					if img, _, nerr := image.Decode(f); nerr != nil {
-						err = nerr
-					} else {
+					var img image.Image
+					if img, _, err = image.Decode(f); err == nil {
 						ann = &Annotation{}
 						ann.Filename = filepath.Base(p)
 						rect := img.Bounds()
@@ -179,10 +136,17 @@ func (h *Handler) GetAnnotation(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if err != nil {
+			logging.Vlog(0, err)
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 		} else if err := ReplyWithJson(&ann, w, r); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
+	}
+}
+
+func (h *Handler) ListObjs(w http.ResponseWriter, r *http.Request) {
+	if err := ReplyWithJson(h.objs, w, r); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -228,6 +192,56 @@ func (h *Handler) getImagePath(w http.ResponseWriter, r *http.Request) string {
 		return p
 	}
 	return ""
+}
+
+func (h *Handler) listDir(dir, absDir string, refresh bool) (*FolderContent, error) {
+	if !refresh {
+		if content := h.cachedDir(dir); content != nil {
+			return content, nil
+		}
+	}
+	file, err := os.Open(absDir)
+	defer file.Close()
+	fis, err := file.Readdir(0)
+	if err != nil {
+		return nil, err
+	}
+	var result FolderContent
+	result.Path = dir
+	for _, fi := range fis {
+		var objects []string
+		if !fi.IsDir() {
+			if !fi.Mode().IsRegular() || !isImageFile(fi.Name()) {
+				continue
+			}
+			if ann, err := readAnnotationXmlFile(
+				annotationXmlFile(filepath.Join(absDir, fi.Name()))); err != nil {
+				if !os.IsNotExist(err) {
+					logging.Vlog(0, err)
+				}
+			} else {
+				objects = uniqueObjectNames(ann.Objects)
+			}
+		}
+		result.Items = append(result.Items, &FolderItem{
+			Name:    fi.Name(),
+			IsDir:   fi.IsDir(),
+			Objects: objects,
+		})
+	}
+	sort.Slice(result.Items, func(i, j int) bool {
+		return result.Items[i].Name < result.Items[j].Name
+	})
+	h.mu.Lock()
+	h.cache[dir] = &result
+	h.mu.Unlock()
+	return &result, nil
+}
+
+func (h *Handler) cachedDir(dir string) *FolderContent {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.cache[dir]
 }
 
 func (h *Handler) removeFromCache(parent, name string) {

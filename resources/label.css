@@ -68,3 +68,28 @@ label-img-tb > .btn {
     padding: 0 3px;
     margin: 0 3px;
 }
+
+.modal-dialog {
+    height: 100%;
+}
+
+.modal-content {
+    flex: 1 1 auto;
+    display: flex;
+    flex-flow: column;
+    max-height: calc(100% - 150px);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.modal-body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-flow: column;
+    overflow: hidden;
+}
+
+.modal-body > ul {
+    overflow-x: hidden;
+    overflow-y: auto;
+}

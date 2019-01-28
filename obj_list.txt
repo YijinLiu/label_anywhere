@@ -1,0 +1,27 @@
+person
+car
+dog
+cat
+truck
+pickup
+bicycle
+animal
+small animal
+bird
+squirrel
+raccoon
+skunk
+bear
+mouse
+rabbit
+motorcycle
+usps
+fedex
+ups
+dhl
+bus
+face
+license plate
+honda
+subaru
+acura

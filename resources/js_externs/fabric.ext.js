@@ -89,9 +89,24 @@ fabric.Object.prototype.complexity = function() {};
 fabric.Event = function() {};
 
 /**
+ * @type {fabric.Point}
+ */
+fabric.Event.prototype.absolutePointer;
+
+/**
  * @type {Event|MouseEvent|TouchEvent}
  */
 fabric.Event.prototype.e;
+
+/**
+ * @type {!boolean}
+ */
+fabric.Event.prototype.isClick;
+
+/**
+ * @type {fabric.Point}
+ */
+fabric.Event.prototype.pointer;
 
 /**
  * @type {fabric.Object}
@@ -235,10 +250,21 @@ fabric.PathGroup = function() {};
 fabric.Pattern = function() {};
 
 /**
+ * @param {!number} x
+ * @param {!number} y
  * @constructor
- * @extends {fabric.Object}
  */
-fabric.Point = function() {};
+fabric.Point = function(x, y) {};
+
+/**
+ * @type {!number}
+ */
+fabric.Point.prototype.x;
+
+/**
+ * @type {!number}
+ */
+fabric.Point.prototype.y;
 
 /**
  * @constructor
@@ -281,6 +307,11 @@ fabric.Triangle = function() {};
  * @extends {fabric.Object}
  */
 fabric.Text = function(text, opt) {};
+
+/**
+ * @type {!string}
+ */
+fabric.Text.prototype.text;
 
 /**
  * @constructor
@@ -331,7 +362,14 @@ fabric.StaticCanvas.prototype.clear = function() {};
  */
 fabric.StaticCanvas.prototype.getObjects = function(opt) {};
 
+/**
+ * @param {...fabric.Object} objs
+ */
+fabric.StaticCanvas.prototype.remove = function(objs) {};
+
 fabric.StaticCanvas.prototype.renderAll = function() {};
+
+fabric.StaticCanvas.prototype.requestRenderAll = function() {};
 
 /**
  * @param {fabric.Image|string} img
@@ -370,7 +408,24 @@ fabric.StaticCanvas.prototype.setZoom = function(value) {};
 fabric.Canvas = function(el) {};
 
 /**
- * @return {Element}
+ * @type {!boolean}
  */
-fabric.Canvas.prototype.getSelectionElement = function() {};
+fabric.Canvas.prototype.selection;
 
+fabric.Canvas.prototype.discardActiveObject = function() {};
+
+/**
+ * @return {fabric.Object}
+ */
+fabric.Canvas.prototype.getActiveObject = function() {};
+
+/**
+ * @param {fabric.Object} obj
+ */
+fabric.Canvas.prototype.setActiveObject = function(obj) {};
+
+/** @type {Obj} */
+fabric.Object.prototype._lblJson;
+
+/** @type {fabric.Text} */
+fabric.Object.prototype._lblText;

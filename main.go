@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"flag"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/YijinLiu/label_anywhere/lib"
@@ -15,9 +19,10 @@ import (
 )
 
 var (
-	addrFlag   = flag.String("addr", ":8080", "")
-	dirFlag    = flag.String("dir", "", "The image dir.")
-	logDirFlag = flag.String("log-dir", "", "Write log to this dir if not empty.")
+	addrFlag        = flag.String("addr", ":8080", "")
+	dirFlag         = flag.String("dir", "", "The image dir.")
+	objListFileFlag = flag.String("obj-list-file", "", "")
+	logDirFlag      = flag.String("log-dir", "", "Write log to this dir if not empty.")
 )
 
 func main() {
@@ -33,7 +38,14 @@ func main() {
 	if addr == "" || dir == "" {
 		logging.Fatal("Please provide --addr and --dir")
 	}
-	handler, err := lib.NewHandler(dir)
+	var objs []string
+	if f := *objListFileFlag; f != "" {
+		var err error
+		if objs, err = readLines(f); err != nil {
+			logging.Vlog(0, err)
+		}
+	}
+	handler, err := lib.NewHandler(dir, objs)
 	if err != nil {
 		logging.Fatal(err)
 	}
@@ -59,4 +71,17 @@ func main() {
 		logging.Vlog(-1, err)
 	}
 	logging.Close()
+}
+
+func readLines(file string) ([]string, error) {
+	fileContent, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	s := bufio.NewScanner(bytes.NewReader(fileContent))
+	var lines []string
+	for s.Scan() {
+		lines = append(lines, strings.TrimSpace(s.Text()))
+	}
+	return lines, nil
 }

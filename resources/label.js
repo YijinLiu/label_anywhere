@@ -132,10 +132,10 @@ label.ImgDirController.prototype.reloadFailed_ = function(resp) {
 label.labelImg_;
 
 /**
- * @param {!string} name
+ * @param {!FolderItem} item
  */
-label.ImgDirController.prototype.open_ = function(name) {
-    label.labelImg_.load_(this.content_.path, name);
+label.ImgDirController.prototype.open_ = function(item) {
+    label.labelImg_.load_(this.content_.path, item);
 };
 
 /**
@@ -195,7 +195,7 @@ label.App.directive('imgDir', function() {
         <img-dir parent="c.${content}.path" name="item.name" is-collapsed="true" ng-if="item.isDir">
         </img-dir>
         <span class="img-dir-title">
-            <a href="#" ng-click="c.${open}(item.name)" ng-if="!item.isDir"
+            <a href="#" ng-click="c.${open}(item)" ng-if="!item.isDir"
                         ng-attr-title="{{item.objects}}" class="name"
                         ng-class="{'annotated' : item.objects && item.objects.length > 0}">
                 {{item.name}}
@@ -225,14 +225,17 @@ label.App.directive('imgDir', function() {
  * @param {!angular.$route} $route
  * @param {!angular.$http} $http
  * @param {!angular.JQLite} $element
+ * @param {!ui.bootstrap.$modal} $uibModal
  * @constructor
  * @struct
  * @ngInject
  */
-label.LabelImgController = function($scope, $route, $http, $element) {
+label.LabelImgController = function($scope, $route, $http, $element, $uibModal) {
     this.scope_ = $scope;
     this.route_ = $route;
     this.http_ = $http;
+    this.modal_ = $uibModal;
+
     const ctnEl = $element[0];
     this.canZoomIn_ = false;
     this.canZoomOut_ = false;
@@ -240,14 +243,56 @@ label.LabelImgController = function($scope, $route, $http, $element) {
     this.height_ = Math.floor(ctnEl.clientHeight);
     this.canvas_ = new fabric.Canvas(ctnEl.querySelector('canvas'));
     this.canvas_.on('mouse:wheel', this.onWheel_.bind(this));
+    this.canvas_.on('mouse:down', this.onMouseDown_.bind(this));
+    this.canvas_.on('mouse:up', this.onMouseUp_.bind(this));
+    this.canvas_.on('object:modified', this.onObjMod_.bind(this));
+    this.canvas_.on('object:moving', this.onObjMoving_.bind(this));
+
     this.parent_ = '';
-    this.name_ = '';
+    /** @type {FolderItem} */
+    this.item_;
     /** @type {fabric.Image} */
     this.img_;
     /** @type {Annotation} */
     this.ann_;
     this.scale_ = 1;
-    label.labelImg_ = this;
+
+    /** @type {fabric.Object} */
+    this.activeObj_;
+    this.isDrawing_ = false;
+    /** @type {fabric.Point} */
+    this.drawingStartPt_;
+    this.objNames_ = ['person'];
+	this.listObjs_();
+
+	label.labelImg_ = this;
+};
+
+label.LabelImgController.prototype.save = function() {
+    if (!this.ann_) return;
+    const url = goog.string.format(
+        'post_ann?parent=%s&name=%s', encodeURIComponent(this.parent_),
+        encodeURIComponent(this.item_.name));
+    this.http_.post(url, JSON.stringify(this.ann_)).then(
+        this.saveDone_.bind(this), this.saveFailed_.bind(this));
+    this.item_.objects = [];
+    for (let i = 0; i < this.ann_.objects.length; i++) {
+        const name = this.ann_.objects[i].name;
+        if (this.item_.objects.indexOf(name) < 0) this.item_.objects.push(name);
+    }
+};
+
+/**
+ * @param {angular.$http.Response} resp
+ */
+label.LabelImgController.prototype.saveDone_ = function(resp) {
+};
+
+/**
+ * @param {angular.$http.Response} resp
+ */
+label.LabelImgController.prototype.saveFailed_ = function(resp) {
+    console.log('Failed to save!');
 };
 
 /**
@@ -267,17 +312,79 @@ label.LabelImgController.prototype.onWheel_ = function(opt) {
 };
 
 /**
- * @param {!string} parent
- * @param {!string} name
+ * @param {!fabric.Event} opt
  */
-label.LabelImgController.prototype.load_ = function(parent, name) {
+label.LabelImgController.prototype.onMouseDown_ = function(opt) {
+    if (opt.target || opt.isClick || !this.ann_) return;
+    this.isDrawing_ = true;
+    this.drawingStartPt_ = opt.pointer;
+    opt.e.preventDefault();
+    opt.e.stopPropagation();
+};
+
+/**
+ * @param {!fabric.Event} opt
+ */
+label.LabelImgController.prototype.onMouseUp_ = function(opt) {
+    this.activeObj_ = opt.target;
+    this.isDrawing_ = false;
+    this.route_.reload();
+    if (opt.target || opt.isClick || !this.drawingStartPt_ || !this.ann_) return;
+    const width = Math.floor(Math.abs(opt.pointer.x - this.drawingStartPt_.x) / this.scale_);
+    const height = Math.floor(Math.abs(opt.pointer.y - this.drawingStartPt_.y) / this.scale_);
+    if (width >= 30 && height >= 30) {
+        const left = Math.floor(Math.min(opt.pointer.x, this.drawingStartPt_.x) / this.scale_);
+        const top = Math.floor(Math.min(opt.pointer.y, this.drawingStartPt_.y) / this.scale_);
+        const obj = /** @type {!Obj} */ ({});
+        obj.bndbox = /** @type {!BoundingBox} */ ({});
+        obj.bndbox.xmin = left;
+        obj.bndbox.ymin = top;
+        obj.bndbox.xmax = left + width;
+        obj.bndbox.ymax = top + height;
+        this.selectObjName_(this.addObj_.bind(this, obj));
+    }
+    opt.e.preventDefault();
+    opt.e.stopPropagation();
+    this.canvas_.discardActiveObject();
+    this.canvas_.requestRenderAll();
+};
+
+/**
+ * @param {!fabric.Event} opt
+ */
+label.LabelImgController.prototype.onObjMod_ = function(opt) {
+    const rect = opt.target;
+    const obj = rect._lblJson;
+    obj.bndbox.xmin = rect.left;
+    obj.bndbox.ymin = rect.top;
+    obj.bndbox.xmax = rect.left + rect.width;
+    obj.bndbox.ymax = rect.top + rect.height;
+    this.save();
+};
+
+/**
+ * @param {!fabric.Event} opt
+ */
+label.LabelImgController.prototype.onObjMoving_ = function(opt) {
+    const rect = opt.target;
+    const text = rect._lblText;
+    text.left = rect.left + 3;
+    text.top = rect.top + 3;
+    this.canvas_.requestRenderAll();
+};
+
+/**
+ * @param {!string} parent
+ * @param {!FolderItem} item
+ */
+label.LabelImgController.prototype.load_ = function(parent, item) {
     this.canvas_.clear();
     this.img_ = null;
     this.ann_ = null;
     this.parent_ = parent;
-    this.name_ = name;
+    this.item_ = item;
     const url = goog.string.format(
-        'get_img?parent=%s&name=%s', encodeURIComponent(parent), encodeURIComponent(name));
+        'get_img?parent=%s&name=%s', encodeURIComponent(parent), encodeURIComponent(item.name));
     fabric.Image.fromURL(url, this.onLoad_.bind(this));
 };
 
@@ -291,7 +398,7 @@ label.LabelImgController.prototype.onLoad_ = function(img) {
     if (img.height * scale > this.height_) scale = this.height_ / img.height;
     this.scaleCanvas_(scale);
     const url = goog.string.format('get_ann?parent=%s&name=%s', encodeURIComponent(this.parent_),
-                                   encodeURIComponent(this.name_));
+                                   encodeURIComponent(this.item_.name));
     this.http_.get(url).then(this.gotAnn_.bind(this), this.getAnnFailed_.bind(this));
 };
 
@@ -307,40 +414,51 @@ label.LabelImgController.prototype.gotAnn_ = function(resp) {
 label.LabelImgController.prototype.renderAnn_ = function() {
     if (!this.ann_) return;
     for (let i = 0; i < this.ann_.objects.length; i++) {
-        const obj = this.ann_.objects[i];
-        const rect = new fabric.Rect({
-            left: Math.floor(obj.bndbox.xmin * this.scale_),
-            top: Math.floor(obj.bndbox.ymin * this.scale_),
-            width: Math.floor((obj.bndbox.xmax - obj.bndbox.xmin) * this.scale_),
-            height: Math.floor((obj.bndbox.ymax - obj.bndbox.ymin) * this.scale_)
-        });
-        rect.fill = 'beige';
-        rect.opacity = 0.4;
-        rect.hasBorders = false;
-        rect.hasRotatingPoint = false;
-        rect.stroke = 'bisque';
-        rect.strokeWidth = 2;
-        const text = new fabric.Text(obj.name, {
-            left: rect.left + 3,
-            top: rect.top + 3,
-            fontSize: 20,
-            fontWeight: 'bold',
-            shadow: 'rgba(0,0,0,0.3) 5px 5px 5px'
-        });
-        text.fill = 'palegreen';
-        text.hasBorders = false;
-        text.hasControls = false;
-        text.selectable = false;
-        this.canvas_.add(rect, text);
+        this.renderObj_(this.ann_.objects[i])
     }
-    this.canvas_.renderAll();
+    this.canvas_.requestRenderAll();
+};
+
+/**
+ * @param {!Obj} obj
+ */
+label.LabelImgController.prototype.renderObj_ = function(obj) {
+    const rect = new fabric.Rect({
+        left: Math.floor(obj.bndbox.xmin * this.scale_),
+        top: Math.floor(obj.bndbox.ymin * this.scale_),
+        width: Math.floor((obj.bndbox.xmax - obj.bndbox.xmin) * this.scale_),
+        height: Math.floor((obj.bndbox.ymax - obj.bndbox.ymin) * this.scale_)
+    });
+    rect.fill = 'beige';
+    rect.opacity = 0.4;
+    rect.hasBorders = false;
+    rect.hasRotatingPoint = false;
+    rect.stroke = 'bisque';
+    rect.strokeWidth = 2;
+    const text = new fabric.Text(obj.name, {
+        left: rect.left + 3,
+        top: rect.top + 3,
+        fontSize: 20,
+        fontWeight: 'bold',
+        shadow: 'rgba(0,0,0,0.3) 5px 5px 5px'
+    });
+    text.fill = 'palegreen';
+    text.hasBorders = false;
+    text.hasControls = false;
+    text.selectable = false;
+    rect._lblJson = obj;
+    rect._lblText = text;
+    this.canvas_.add(rect, text);
+    this.canvas_.setActiveObject(rect);
+    this.activeObj_ = rect;
+    this.route_.reload();
 };
 
 /**
  * @param {angular.$http.Response} resp
  */
 label.LabelImgController.prototype.getAnnFailed_ = function(resp) {
-    alert(goog.string.format('failed to load annotation for "%s"!', this.name_));
+    alert(goog.string.format('failed to load annotation for "%s"!', this.item_.name));
 };
 
 /**
@@ -393,6 +511,141 @@ label.LabelImgController.prototype.zoomOut_ = function(times) {
     this.scaleCanvas_(scale);
 };
 
+label.LabelImgController.prototype.listObjs_ = function() {
+    this.http_.get('list_objs').then(this.gotObjs_.bind(this), this.listObjsFailed_.bind(this));
+};
+
+/**
+ * @param {angular.$http.Response} resp
+ */
+label.LabelImgController.prototype.gotObjs_ = function(resp) {
+    this.objNames_ = resp.data;
+    if (!this.objNames_ || this.objNames_.length == 0) {
+        this.objNames_ = ['person'];
+    }
+};
+
+/**
+ * @param {angular.$http.Response} resp
+ */
+label.LabelImgController.prototype.listObjsFailed_ = function(resp) {
+    alert('Failed to fetch object list!');
+    this.objNames_ = ['person'];
+};
+
+/**
+ * @param {!function(!string)} cb
+ */
+label.LabelImgController.prototype.selectObjName_ = function(cb) {
+    /** @type {!label.SelectObjController} */
+    let ctl;
+
+    const close = goog.reflect.objectProperty('close', ctl);
+    const done = goog.reflect.objectProperty('done_', ctl);
+    const names = goog.reflect.objectProperty('names_', ctl);
+
+    const tpl = `
+<div class="modal-header">
+	<h3 class="modal-title" id="modal-title">Please choose an object</h3>
+</div>
+<div class="modal-body" id="modal-body">
+	<ul>
+		<li ng-repeat="name in c.${names}">
+			<a href="#" ng-click="$event.preventDefault(); c.${done}(name); c.${close}()">
+                {{name}}
+            </a>
+		</li>
+	</ul>
+</div>
+<div class="modal-footer">
+	<button class="btn btn-warning" type="button" ng-click="c.${close}()">
+		Cancel
+	</button>
+</div>`;
+
+    const me = this;
+    this.modal_.open({
+        animation: true,
+        template: tpl,
+        size: 'sm',
+        controller: label.SelectObjController,
+        controllerAs: 'c',
+        resolve: {
+            names: function() { return me.objNames_; },
+            done: function() { return cb; }
+        }
+    });
+};
+
+/**
+ * @param {!string} name
+ */
+label.LabelImgController.prototype.prioritizeObjName_ = function(name) {
+    for (let i = 0; i < this.objNames_.length; i++) {
+        if (this.objNames_[i] == name) {
+            this.objNames_.splice(i, 1);
+            this.objNames_.unshift(name);
+            break;
+        }
+    }
+};
+
+/**
+ * @param {!Obj} obj
+ * @param {!string} name
+ */
+label.LabelImgController.prototype.addObj_ = function(obj, name) {
+    if (this.ann_) {
+        obj.name = name;
+        this.ann_.objects.push(obj);
+        this.renderObj_(obj);
+        this.save();
+    }
+    this.prioritizeObjName_(name);
+};
+
+/**
+ * @param {!fabric.Object} obj
+ * @param {!string} name
+ */
+label.LabelImgController.prototype.changeObj_ = function(obj, name) {
+    if (this.ann_) {
+        this.activeObj_ = obj;
+        obj._lblJson.name = name;
+        obj._lblText.text = name;
+        this.canvas_.requestRenderAll();
+        this.save();
+        this.route_.reload();
+    }
+    this.prioritizeObjName_(name);
+};
+
+/**
+ * @param {!fabric.Object} obj
+ */
+label.LabelImgController.prototype.tryChangeObj_ = function(obj) {
+    this.selectObjName_(this.changeObj_.bind(this, obj));
+};
+
+/**
+ * @param {!fabric.Object} rect
+ */
+label.LabelImgController.prototype.delObj_ = function(rect) {
+    if (this.ann_) {
+        const obj = rect._lblJson;
+        for (let i = 0; i < this.ann_.objects.length; i++) {
+            if (this.ann_.objects[i] == obj) {
+                this.ann_.objects.splice(i, 1);
+                break;
+            }
+        }
+        this.canvas_.remove(rect);
+        this.canvas_.remove(rect._lblText);
+        this.canvas_.requestRenderAll();
+        this.save();
+    }
+};
+
 label.App.directive('labelImg', function() {
     /** @type {!label.LabelImgController} */
     let ctl;
@@ -410,6 +663,24 @@ label.App.directive('labelImg', function() {
 });
 
 /**
+ * @param {!ui.bootstrap.modalInstance} $uibModalInstance
+ * @param {!Array<!string>} names
+ * @param {!function(!string)} done
+ * @constructor
+ * @struct
+ * @ngInject
+ */
+label.SelectObjController = function($scope, $uibModalInstance, names, done) {
+    this.modalInst_ = $uibModalInstance;
+    this.names_ = names;
+    this.done_ = done;
+};
+
+label.SelectObjController.prototype.close = function() {
+    this.modalInst_.close();
+};
+
+/**
  * @param {!angular.JQLite} $element
  * @constructor
  * @struct
@@ -422,6 +693,19 @@ label.ToolbarController = function($element) {
     };
     this.canZoomOut_ = function() {
         return label.labelImg_ && label.labelImg_.canZoomOut_;
+    };
+    this.delete_ = function() {
+        if (label.labelImg_.activeObj_) {
+            label.labelImg_.delObj_(label.labelImg_.activeObj_);
+        }
+    };
+    this.edit_ = function() {
+        if (label.labelImg_.activeObj_) {
+            label.labelImg_.tryChangeObj_(label.labelImg_.activeObj_);
+        }
+    };
+    this.hasActive_ = function() {
+        return label.labelImg_ && label.labelImg_.activeObj_;
     };
     this.zoomIn_ = function(scale) {
         label.labelImg_.zoomIn_(scale);
@@ -437,6 +721,9 @@ label.App.directive('labelImgTb', function() {
 
     const canZoomIn = goog.reflect.objectProperty('canZoomIn_', ctl);
     const canZoomOut = goog.reflect.objectProperty('canZoomOut_', ctl);
+    const del = goog.reflect.objectProperty('delete_', ctl);
+    const edit = goog.reflect.objectProperty('edit_', ctl);
+    const hasActive = goog.reflect.objectProperty('hasActive_', ctl);
     const zoomIn = goog.reflect.objectProperty('zoomIn_', ctl);
     const zoomOut = goog.reflect.objectProperty('zoomOut_', ctl);
 
@@ -446,6 +733,12 @@ label.App.directive('labelImgTb', function() {
 </a>
 <a role="button" class="btn btn-sm" ng-click="c.${zoomOut}(0.8)" ng-disabled="!c.${canZoomOut}()">
     <i class="fa fa-search-minus"></i>
+</a>
+<a role="button" class="btn btn-sm" ng-click="c.${del}()" ng-disabled="!c.${hasActive}()">
+    <i class="fa fa-trash"></i>
+</a>
+<a role="button" class="btn btn-sm" ng-click="c.${edit}()" ng-disabled="!c.${hasActive}()">
+    <i class="fa fa-edit"></i>
 </a>`;
 
     return {

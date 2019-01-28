@@ -21,8 +21,8 @@ type FolderItem struct {
 }
 
 type FolderContent struct {
-	Path  string       `json:"path"`
-	Items []FolderItem `json:"items"`
+	Path  string        `json:"path"`
+	Items []*FolderItem `json:"items"`
 }
 
 type ImageSize struct {
