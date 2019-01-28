@@ -7,6 +7,15 @@ goog.require('goog.string.format');
 
 goog.require('draggable');
 
+const MIN_OBJ_SIZE = 30;
+const MIN_CANVAS_SIZE = 300;
+const TEXT_OFFSET = 1;
+const MIN_OBJ_MOVE = 1;
+const CONTROL_SIZE = 8;
+const RECT_FILL_COLOR = 'beige';
+const RECT_BORDER_COLOR = 'bisque';
+const TEXT_COLOR = 'palegreen';
+
 // NOTE: Due to security reasons, this doesn't work.
 if (goog.labs.userAgent.device.isMobile() || goog.labs.userAgent.device.isTablet()) {
     if (screen.orientation && screen.orientation.lock) {
@@ -144,11 +153,11 @@ label.Controller.prototype.onKeyDown_ = function(evt) {
     } else if (ke.key == 'ArrowUp') {
         if (this.labelImgCtl_.activeObj_) {
             if (ke.ctrlKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, -5, 0, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, -MIN_OBJ_MOVE, 0, 0);
             } else if (ke.shiftKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 0, -5);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 0, -MIN_OBJ_MOVE);
             } else {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, -5, 0, -5);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, -MIN_OBJ_MOVE, 0, -MIN_OBJ_MOVE);
             }
             evt.preventDefault();
             evt.stopPropagation();
@@ -156,11 +165,11 @@ label.Controller.prototype.onKeyDown_ = function(evt) {
     } else if (ke.key == 'ArrowDown') {
         if (this.labelImgCtl_.activeObj_) {
             if (ke.ctrlKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 0, 5);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 0, MIN_OBJ_MOVE);
             } else if (ke.shiftKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 5, 0, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, MIN_OBJ_MOVE, 0, 0);
             } else {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 5, 0, 5);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, MIN_OBJ_MOVE, 0, MIN_OBJ_MOVE);
             }
             evt.preventDefault();
             evt.stopPropagation();
@@ -168,11 +177,11 @@ label.Controller.prototype.onKeyDown_ = function(evt) {
     } else if (ke.key == 'ArrowLeft') {
         if (this.labelImgCtl_.activeObj_) {
             if (ke.ctrlKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, -5, 0, 0, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, -MIN_OBJ_MOVE, 0, 0, 0);
             } else if (ke.shiftKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, -5, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, -MIN_OBJ_MOVE, 0);
             } else {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, -5, 0, -5, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, -MIN_OBJ_MOVE, 0, -MIN_OBJ_MOVE, 0);
             }
             evt.preventDefault();
             evt.stopPropagation();
@@ -180,11 +189,11 @@ label.Controller.prototype.onKeyDown_ = function(evt) {
     } else if (ke.key == 'ArrowRight') {
         if (this.labelImgCtl_.activeObj_) {
             if (ke.ctrlKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 5, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, MIN_OBJ_MOVE, 0);
             } else if (ke.shiftKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 5, 0, 0, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, MIN_OBJ_MOVE, 0, 0, 0);
             } else {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 5, 0, 5, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, MIN_OBJ_MOVE, 0, MIN_OBJ_MOVE, 0);
             }
             evt.preventDefault();
             evt.stopPropagation();
@@ -503,11 +512,6 @@ label.LabelImgController.prototype.onMouseDown_ = function(opt) {
     opt.e.stopPropagation();
 };
 
-const MIN_OBJ_SIZE = 30;
-const MIN_CANVAS_SIZE = 300;
-const TEXT_OFFSET = 1;
-const RECT_FILL_COLOR = 'beige';
-
 /**
  * @param {!fabric.Event} opt
  */
@@ -541,10 +545,14 @@ label.LabelImgController.prototype.onMouseUp_ = function(opt) {
 label.LabelImgController.prototype.onObjMod_ = function(opt) {
     const rect = opt.target;
     const obj = rect._lblJson;
-    obj.bndbox.xmin = rect.left;
-    obj.bndbox.ymin = rect.top;
-    obj.bndbox.xmax = rect.left + rect.width;
-    obj.bndbox.ymax = rect.top + rect.height;
+    obj.bndbox.xmin = Math.floor(rect.left / this.scale_);
+    obj.bndbox.ymin = Math.floor(rect.top / this.scale_);
+    obj.bndbox.xmax = Math.floor((rect.left + rect.width) / this.scale_);
+    obj.bndbox.ymax = Math.floor((rect.top + rect.height) / this.scale_);
+    const text = rect._lblText;
+    text.left = rect.left + TEXT_OFFSET;
+    text.top = rect.top + TEXT_OFFSET;
+    this.canvas_.requestRenderAll();
     this.save();
 };
 
@@ -599,21 +607,20 @@ label.LabelImgController.prototype.renderObj_ = function(obj) {
         width: Math.floor((obj.bndbox.xmax - obj.bndbox.xmin) * this.scale_),
         height: Math.floor((obj.bndbox.ymax - obj.bndbox.ymin) * this.scale_)
     });
+    rect.cornerSize = CONTROL_SIZE;
     rect.fill = RECT_FILL_COLOR;
     rect.opacity = 0.4;
-    rect.hasBorders = false;
     rect.hasRotatingPoint = false;
-    rect.stroke = 'bisque';
+    rect.stroke = RECT_BORDER_COLOR;
     rect.strokeWidth = 2;
     const text = new fabric.Text(obj.name, {
         left: rect.left + TEXT_OFFSET,
         top: rect.top + TEXT_OFFSET,
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 'bold',
         shadow: 'rgba(0,0,0,0.3) 5px 5px 5px'
     });
-    text.fill = 'palegreen';
-    text.hasBorders = false;
+    text.fill = TEXT_COLOR;
     text.hasControls = false;
     text.selectable = false;
     rect._lblJson = obj;
@@ -665,7 +672,7 @@ label.LabelImgController.prototype.zoomIn_ = function(times) {
     if (!this.canZoomIn_) return;
     let scale = this.scale_ * times;
     if (this.img_.width * scale > this.width_) scale = this.width_ / this.img_.width;
-    if (this.img_.width * scale > this.height_) scale = this.height_ / this.img_.height;
+    if (this.img_.height * scale > this.height_) scale = this.height_ / this.img_.height;
     this.scaleCanvas_(scale);
 };
 

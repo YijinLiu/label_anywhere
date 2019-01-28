@@ -9,6 +9,11 @@ var fabric = {};
 fabric.Object = function() {};
 
 /**
+ * @type {!number}
+ */
+fabric.Object.prototype.cornerSize;
+
+/**
  * @type {string}
  */
 fabric.Object.prototype.fill;
