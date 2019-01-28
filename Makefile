@@ -62,11 +62,21 @@ $(GEN_JS_DEPS): $(ROOT_DIR)/src/github.com/YijinLiu/label_anywhere/resources/gen
 
 CLOSURE_LIBRARY_DIR:=/usr/local/closure-library/v20170409
 CLOSURE_JS_SRCS:=$(CLOSURE_LIBRARY_DIR)/closure/goog/base.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/array/array.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/asserts/asserts.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/debug/error.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/dom/nodetype.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/events/eventtype.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/labs/useragent/browser.js \
                  $(CLOSURE_LIBRARY_DIR)/closure/goog/labs/useragent/device.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/labs/useragent/engine.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/labs/useragent/platform.js \
                  $(CLOSURE_LIBRARY_DIR)/closure/goog/labs/useragent/util.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/object/object.js \
                  $(CLOSURE_LIBRARY_DIR)/closure/goog/reflect/reflect.js \
                  $(CLOSURE_LIBRARY_DIR)/closure/goog/string/string.js \
-                 $(CLOSURE_LIBRARY_DIR)/closure/goog/string/stringformat.js
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/string/stringformat.js \
+                 $(CLOSURE_LIBRARY_DIR)/closure/goog/useragent/useragent.js
 
 JS_SRCS:=$(RES_DIR)/draggable.js \
          $(RES_DIR)/label.js \

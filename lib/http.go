@@ -167,7 +167,7 @@ func (h *Handler) PostAnnotation(w http.ResponseWriter, r *http.Request) {
 			if err := os.Remove(xmlFile); err != nil {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 			}
-			h.removeFromCache(r.FormValue("parent"), r.FormValue("name"))
+			h.updateCache(r.FormValue("parent"), r.FormValue("name"), nil)
 		} else if xmlData, err := xml.Marshal(&ann); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		} else if err := ioutil.WriteFile(xmlFile, xmlData, 0600); err != nil {
@@ -230,6 +230,10 @@ func (h *Handler) listDir(dir, absDir string, refresh bool) (*FolderContent, err
 		})
 	}
 	sort.Slice(result.Items, func(i, j int) bool {
+		i1, i2 := result.Items[i], result.Items[j]
+		if i1.IsDir != i2.IsDir {
+			return i1.IsDir
+		}
 		return result.Items[i].Name < result.Items[j].Name
 	})
 	h.mu.Lock()

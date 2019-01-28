@@ -24,7 +24,7 @@ function FolderContent() {}
 FolderContent.prototype.path;
 
 /**
- * @type {Array<FolderItem>}
+ * @type {Array<!FolderItem>}
  */
 FolderContent.prototype.items;
 

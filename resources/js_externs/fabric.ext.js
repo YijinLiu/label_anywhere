@@ -125,6 +125,12 @@ fabric.Object.prototype.on = function(evt, cb) {};
 fabric.Object.prototype.render = function(ctx) {};
 
 /**
+ * @param {!string} name
+ * @param {*} value
+ */
+fabric.Object.prototype.set = function(name, value) {};
+
+/**
  * @param {{bl: boolean,
  *          br: boolean,
  *          ml: boolean,

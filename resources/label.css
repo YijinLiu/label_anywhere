@@ -44,6 +44,10 @@ body,
     text-overflow: ellipsis;
 }
 
+#list .name.editing {
+    font-weight: bold;
+}
+
 #image {
     position: relative;
     width: calc(70% - 3px);

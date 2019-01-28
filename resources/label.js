@@ -1,5 +1,6 @@
 goog.provide('label.App');
 
+goog.require('goog.events.EventType');
 goog.require('goog.labs.userAgent.device');
 goog.require('goog.reflect');
 goog.require('goog.string.format');
@@ -21,14 +22,16 @@ if (goog.labs.userAgent.device.isMobile() || goog.labs.userAgent.device.isTablet
 }
 
 /**
+ * @param {!angular.Scope} $scope
  * @constructor
  * @struct
  * @ngInject
  */
-label.Controller = function() {
-    this.splitterEl_ = /** @type {!Element} */ (document.querySelector('.splitter'));
+label.Controller = function($scope) {
     this.leftEl_ = document.querySelector('#list');
     this.rightEl_ = document.querySelector('#image');
+
+    this.splitterEl_ = /** @type {!Element} */ (document.querySelector('.splitter'));
     this.hammer_ = new Hammer(this.splitterEl_, {'touchAction': 'none'});
     this.hammer_.get('swipe').set({'enable': false});
     this.hammer_.get('tap').set({'enable': false});
@@ -38,9 +41,156 @@ label.Controller = function() {
     this.hammer_.get('pinch').set({'enable': false});
     this.hammer_.get('pan').set({'enable': true});
     this.hammer_.on('pan', this.dragSplitter_.bind(this));
+
     this.isDragging_ = false;
     this.leftWidth_ = -1;
     this.rightWidth_ = -1;
+
+    window.addEventListener(goog.events.EventType.KEYDOWN, this.onKeyDown_.bind(this));
+
+    /** @type {!Array<!label.ImgDirController>} */
+    this.imgDirCtls_ = [];
+    /** @type {label.ImgDirController} */
+    this.curImgDirCtl_;
+    this.curImgIndex_ = -1;
+    /** @type {Element} */
+    this.curImgEl_;
+    $scope['imgDirCreated'] = this.imgDirCreated_.bind(this);
+    /** @type {label.LabelImgController} */
+    this.labelImgCtl_;
+    $scope['labelImgCreated'] = this.labelImgCreated_.bind(this);
+};
+
+/**
+ * @param {!label.ImgDirController} ctl
+ */
+label.Controller.prototype.imgDirCreated_ = function(ctl) {
+    console.log('img-dir(%s) created.', ctl.name_);
+    this.imgDirCtls_.push(ctl);
+    const me = this;
+    ctl.openImgCb_ = this.openImg_.bind(this);
+};
+
+/**
+ * @param {!Element} el
+ */
+function scrollIntoViewIfNeeded(el) {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < 0 || rect.left < 0 ||
+        rect.right > (window.innerWidth || document.documentElement.clientWidth) ||
+        rect.bottom > (window.innerHeight || document.documentElement.clientHeight)) {
+        el.scrollIntoView();
+    }
+}
+
+/**
+ * @param {!label.ImgDirController} ctl
+ * @param {!number} i
+ * @param {!Element} el
+ */
+label.Controller.prototype.openImg_ = function(ctl, i, el) {
+    const item = ctl.content_.items[i];
+    if (item.isDir) return;
+    this.curImgDirCtl_ = ctl;
+    this.curImgIndex_ = i;
+    if (this.curImgEl_) this.curImgEl_.classList.remove('editing');
+    this.curImgEl_ = el;
+    el.classList.add('editing');
+    scrollIntoViewIfNeeded(el);
+    this.labelImgCtl_.open(ctl.content_.path, item);
+};
+
+label.Controller.prototype.nextImg_ = function() {
+    if (!this.curImgDirCtl_) return;
+    const i = this.curImgIndex_ + 1;
+    if (i >= this.curImgDirCtl_.content_.items.length) return;
+    this.openImg_(this.curImgDirCtl_, i, this.curImgDirCtl_.nthItemEl_(i));
+};
+
+label.Controller.prototype.prevImg_ = function() {
+    if (!this.curImgDirCtl_) return;
+    const i = this.curImgIndex_ - 1;
+    if (i < 0) return;
+    this.openImg_(this.curImgDirCtl_, i, this.curImgDirCtl_.nthItemEl_(i));
+};
+
+/**
+ * @param {!label.LabelImgController} ctl
+ */
+label.Controller.prototype.labelImgCreated_ = function(ctl) {
+    console.log('label-img created.');
+    this.labelImgCtl_ = ctl;
+};
+
+/**
+ * @param {Event} evt
+ */
+label.Controller.prototype.onKeyDown_ = function(evt) {
+    const ke = /** @type {KeyboardEvent} */ (evt);
+    console.log(ke.key);
+    if (ke.key == 'PageDown') {
+        this.nextImg_();
+        evt.preventDefault();
+        evt.stopPropagation();
+    } else if (ke.key == 'PageUp') {
+        this.prevImg_();
+        evt.preventDefault();
+        evt.stopPropagation();
+    } else if (ke.key == 'Delete') {
+        if (this.labelImgCtl_.activeObj_) {
+            this.labelImgCtl_.delObj_(this.labelImgCtl_.activeObj_);
+            evt.preventDefault();
+            evt.stopPropagation();
+        }
+    } else if (ke.key == 'ArrowUp') {
+        if (this.labelImgCtl_.activeObj_) {
+            if (ke.ctrlKey) {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, -5, 0, 0);
+            } else if (ke.shiftKey) {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 0, -5);
+            } else {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, -5, 0, -5);
+            }
+            evt.preventDefault();
+            evt.stopPropagation();
+        }
+    } else if (ke.key == 'ArrowDown') {
+        if (this.labelImgCtl_.activeObj_) {
+            if (ke.ctrlKey) {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 0, 5);
+            } else if (ke.shiftKey) {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 5, 0, 0);
+            } else {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 5, 0, 5);
+            }
+            evt.preventDefault();
+            evt.stopPropagation();
+        }
+    } else if (ke.key == 'ArrowLeft') {
+        if (this.labelImgCtl_.activeObj_) {
+            if (ke.ctrlKey) {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, -5, 0, 0, 0);
+            } else if (ke.shiftKey) {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, -5, 0);
+            } else {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, -5, 0, -5, 0);
+            }
+            evt.preventDefault();
+            evt.stopPropagation();
+        }
+    } else if (ke.key == 'ArrowRight') {
+        if (this.labelImgCtl_.activeObj_) {
+            if (ke.ctrlKey) {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 5, 0);
+            } else if (ke.shiftKey) {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 5, 0, 0, 0);
+            } else {
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 5, 0, 5, 0);
+            }
+            evt.preventDefault();
+            evt.stopPropagation();
+        }
+    }
 };
 
 /** @param {Hammer.Event} evt */
@@ -78,31 +228,49 @@ label.App.controller('labelCtrl', label.Controller).config(label.Controller.conf
  * @param {!angular.Scope} $scope
  * @param {!angular.$route} $route
  * @param {!angular.$http} $http
+ * @param {!angular.JQLite} $element
  * @constructor
  * @struct
  * @ngInject
  */
-label.ImgDirController = function($scope, $route, $http) {
+label.ImgDirController = function($scope, $route, $http, $element) {
     this.scope_ = $scope;
     this.route_ = $route;
     this.http_ = $http;
+    this.el_ = $element[0];
     this.parent_ = $scope['parent'];
     this.name_ = $scope['name'];
     /** @type {FolderContent} */
     this.content_;
     this.reloading_ = false;
-    if (!$scope['isCollapsed']) this.reload_();
+    if (!$scope['isCollapsed']) this.reload_(false);
+
+    /** @type {!function(!label.ImgDirController, !number, !Element)} */
+    this.openImgCb_;
+    const link = $scope['link'];
+    if (link) link(this);
+};
+
+/**
+ * @param {!number} n
+ */
+label.ImgDirController.prototype.nthItemEl_ = function(n) {
+    return this.el_.children[1].children[n].querySelector('.name');
 };
 
 label.ImgDirController.prototype.checkReload_ = function() {
-    if (!this.content_) this.reload_();
+    if (!this.content_) this.reload_(false);
 };
 
-label.ImgDirController.prototype.reload_ = function() {
+/**
+ * @param {!boolean} refresh
+ */
+label.ImgDirController.prototype.reload_ = function(refresh) {
     this.reloading_ = true;
-    const url = goog.string.format('list_dir?parent=%s&name=%s',
-                                   encodeURIComponent(this.parent_),
-                                   encodeURIComponent(this.name_));
+    let url = goog.string.format('list_dir?parent=%s&name=%s',
+                                 encodeURIComponent(this.parent_),
+                                 encodeURIComponent(this.name_));
+    if (refresh) url += '&refresh=1';
     this.http_.get(url).then(this.reloadDone_.bind(this), this.reloadFailed_.bind(this));
     this.route_.reload();
 };
@@ -127,15 +295,11 @@ label.ImgDirController.prototype.reloadFailed_ = function(resp) {
 };
 
 /**
- * @type {label.LabelImgController}
+ * @param {!number} i
+ * @param {!Element} el
  */
-label.labelImg_;
-
-/**
- * @param {!FolderItem} item
- */
-label.ImgDirController.prototype.open_ = function(item) {
-    label.labelImg_.load_(this.content_.path, item);
+label.ImgDirController.prototype.open_ = function(i, el) {
+    this.openImgCb_(this, i, el);
 };
 
 /**
@@ -185,17 +349,18 @@ label.App.directive('imgDir', function() {
         <i class="fa" ng-class="{'fa-caret-right': isCollapsed, 'fa-caret-down': !isCollapsed}">
         </i>
     </a><span class="name">{{name}}</span>
-    <a role="button" class="btn btn-sm" ng-click="c.${reload}()"
+    <a role="button" class="btn btn-sm" ng-click="c.${reload}(true)"
                      ng-disabled="c.${reloading}">
         <i class="fa fa-refresh fa-fw" ng-class="{'fa-spin' : c.${reloading}}"></i>
     </a>
 </span>
 <div uib-collapse="isCollapsed" expanding="c.${checkReload}()">
     <div class="dependent-item" ng-repeat="item in c.${content}.items">
-        <img-dir parent="c.${content}.path" name="item.name" is-collapsed="true" ng-if="item.isDir">
+        <img-dir parent="c.${content}.path" name="item.name" is-collapsed="true" link="link"
+                 ng-if="item.isDir">
         </img-dir>
         <span class="img-dir-title">
-            <a href="#" ng-click="c.${open}(item)" ng-if="!item.isDir"
+            <a href="#" ng-click="c.${open}($index, $event.target)" ng-if="!item.isDir"
                         ng-attr-title="{{item.objects}}" class="name"
                         ng-class="{'annotated' : item.objects && item.objects.length > 0}">
                 {{item.name}}
@@ -213,6 +378,7 @@ label.App.directive('imgDir', function() {
             'parent': '<',
             'name': '<',
             'isCollapsed': '=',
+            'link': '<'
         },
         template: tpl,
         controller: label.ImgDirController,
@@ -265,7 +431,23 @@ label.LabelImgController = function($scope, $route, $http, $element, $uibModal) 
     this.objNames_ = ['person'];
 	this.listObjs_();
 
-	label.labelImg_ = this;
+    const link = $scope['link'];
+    if (link) link(this);
+};
+
+/**
+ * @param {!string} parent
+ * @param {!FolderItem} item
+ */
+label.LabelImgController.prototype.open = function(parent, item) {
+    this.canvas_.clear();
+    this.img_ = null;
+    this.ann_ = null;
+    this.parent_ = parent;
+    this.item_ = item;
+    const url = goog.string.format(
+        'get_img?parent=%s&name=%s', encodeURIComponent(parent), encodeURIComponent(item.name));
+    fabric.Image.fromURL(url, this.onLoad_.bind(this));
 };
 
 label.LabelImgController.prototype.save = function() {
@@ -322,6 +504,11 @@ label.LabelImgController.prototype.onMouseDown_ = function(opt) {
     opt.e.stopPropagation();
 };
 
+const MIN_OBJ_SIZE = 30;
+const MIN_CANVAS_SIZE = 300;
+const TEXT_OFFSET = 1;
+const RECT_FILL_COLOR = 'beige';
+
 /**
  * @param {!fabric.Event} opt
  */
@@ -332,7 +519,7 @@ label.LabelImgController.prototype.onMouseUp_ = function(opt) {
     if (opt.target || opt.isClick || !this.drawingStartPt_ || !this.ann_) return;
     const width = Math.floor(Math.abs(opt.pointer.x - this.drawingStartPt_.x) / this.scale_);
     const height = Math.floor(Math.abs(opt.pointer.y - this.drawingStartPt_.y) / this.scale_);
-    if (width >= 30 && height >= 30) {
+    if (width >= MIN_OBJ_SIZE && height >= MIN_OBJ_SIZE) {
         const left = Math.floor(Math.min(opt.pointer.x, this.drawingStartPt_.x) / this.scale_);
         const top = Math.floor(Math.min(opt.pointer.y, this.drawingStartPt_.y) / this.scale_);
         const obj = /** @type {!Obj} */ ({});
@@ -368,24 +555,9 @@ label.LabelImgController.prototype.onObjMod_ = function(opt) {
 label.LabelImgController.prototype.onObjMoving_ = function(opt) {
     const rect = opt.target;
     const text = rect._lblText;
-    text.left = rect.left + 3;
-    text.top = rect.top + 3;
+    text.left = rect.left + TEXT_OFFSET;
+    text.top = rect.top + TEXT_OFFSET;
     this.canvas_.requestRenderAll();
-};
-
-/**
- * @param {!string} parent
- * @param {!FolderItem} item
- */
-label.LabelImgController.prototype.load_ = function(parent, item) {
-    this.canvas_.clear();
-    this.img_ = null;
-    this.ann_ = null;
-    this.parent_ = parent;
-    this.item_ = item;
-    const url = goog.string.format(
-        'get_img?parent=%s&name=%s', encodeURIComponent(parent), encodeURIComponent(item.name));
-    fabric.Image.fromURL(url, this.onLoad_.bind(this));
 };
 
 /**
@@ -429,15 +601,15 @@ label.LabelImgController.prototype.renderObj_ = function(obj) {
         width: Math.floor((obj.bndbox.xmax - obj.bndbox.xmin) * this.scale_),
         height: Math.floor((obj.bndbox.ymax - obj.bndbox.ymin) * this.scale_)
     });
-    rect.fill = 'beige';
+    rect.fill = RECT_FILL_COLOR;
     rect.opacity = 0.4;
     rect.hasBorders = false;
     rect.hasRotatingPoint = false;
     rect.stroke = 'bisque';
     rect.strokeWidth = 2;
     const text = new fabric.Text(obj.name, {
-        left: rect.left + 3,
-        top: rect.top + 3,
+        left: rect.left + TEXT_OFFSET,
+        top: rect.top + TEXT_OFFSET,
         fontSize: 20,
         fontWeight: 'bold',
         shadow: 'rgba(0,0,0,0.3) 5px 5px 5px'
@@ -458,7 +630,7 @@ label.LabelImgController.prototype.renderObj_ = function(obj) {
  * @param {angular.$http.Response} resp
  */
 label.LabelImgController.prototype.getAnnFailed_ = function(resp) {
-    alert(goog.string.format('failed to load annotation for "%s"!', this.item_.name));
+    alert(goog.string.format('Failed to load annotation for "%s"!', this.item_.name));
 };
 
 /**
@@ -482,8 +654,9 @@ label.LabelImgController.prototype.scaleCanvas_ = function(scale) {
 label.LabelImgController.prototype.updateZooming_ = function() {
     this.canZoomIn_ = !!this.img_ && this.canvas_.width < this.width_ &&
         this.canvas_.height < this.height_;
-    this.canZoomOut_ = !!this.img_ && this.canvas_.width > Math.min(this.img_.width, 300) &&
-        this.canvas_.height > Math.min(this.img_.height, 300);
+    this.canZoomOut_ = !!this.img_ && 
+        this.canvas_.width > Math.min(this.img_.width, MIN_CANVAS_SIZE) &&
+        this.canvas_.height > Math.min(this.img_.height, MIN_CANVAS_SIZE);
     this.route_.reload();
 };
 
@@ -504,9 +677,9 @@ label.LabelImgController.prototype.zoomIn_ = function(times) {
 label.LabelImgController.prototype.zoomOut_ = function(times) {
     if (!this.canZoomOut_) return;
     let scale = this.scale_ * times;
-    const minWidth = Math.min(this.img_.width, 300);
+    const minWidth = Math.min(this.img_.width, MIN_CANVAS_SIZE);
     if (this.img_.width * scale < minWidth) scale = minWidth / this.img_.width;
-    const minHeight = Math.min(this.img_.height, 300);
+    const minHeight = Math.min(this.img_.height, MIN_CANVAS_SIZE);
     if (this.img_.height * scale < minHeight) scale = minHeight / this.img_.height;
     this.scaleCanvas_(scale);
 };
@@ -643,6 +816,61 @@ label.LabelImgController.prototype.delObj_ = function(rect) {
         this.canvas_.remove(rect._lblText);
         this.canvas_.requestRenderAll();
         this.save();
+        if (rect == this.activeObj_) this.activeObj_ = null;
+    }
+};
+
+/**
+ * @param {!fabric.Object} rect
+ * @param {!number} xminD
+ * @param {!number} yminD
+ * @param {!number} xmaxD
+ * @param {!number} ymaxD
+ */
+label.LabelImgController.prototype.moveObj_ = function(rect, xminD, yminD, xmaxD, ymaxD) {
+    if (this.ann_) {
+        const obj = rect._lblJson;
+        obj.bndbox.xmin += xminD;
+        if (obj.bndbox.xmin < 0) {
+            obj.bndbox.xmin = 0;
+        } else if (obj.bndbox.xmin > this.img_.width - MIN_OBJ_SIZE) {
+            obj.bndbox.xmin = this.img_.width - MIN_OBJ_SIZE;
+        }
+        obj.bndbox.ymin += yminD;
+        if (obj.bndbox.ymin < 0) {
+            obj.bndbox.ymin = 0;
+        } else if (obj.bndbox.ymin > this.img_.height - MIN_OBJ_SIZE) {
+            obj.bndbox.ymin = this.img_.height - MIN_OBJ_SIZE;
+        }
+        obj.bndbox.xmax += xmaxD;
+        if (obj.bndbox.xmax < obj.bndbox.xmin + MIN_OBJ_SIZE) {
+            obj.bndbox.xmax = obj.bndbox.xmin + MIN_OBJ_SIZE;
+            if (obj.bndbox.xmax > this.img_.width) {
+                obj.bndbox.xmax = this.img_.width;
+                obj.bndbox.xmin = obj.bndbox.xmax - MIN_OBJ_SIZE;
+            }
+        } else if (obj.bndbox.xmax > this.img_.width) {
+            obj.bndbox.xmax = this.img_.width;
+        }
+        obj.bndbox.ymax += ymaxD;
+        if (obj.bndbox.ymax < obj.bndbox.ymin + MIN_OBJ_SIZE) {
+            obj.bndbox.ymax = obj.bndbox.ymin + MIN_OBJ_SIZE;
+            if (obj.bndbox.ymax > this.img_.height) {
+                obj.bndbox.ymax = this.img_.height;
+                obj.bndbox.ymin = obj.bndbox.ymax - MIN_OBJ_SIZE;
+            }
+        } else if (obj.bndbox.ymax > this.img_.height) {
+            obj.bndbox.ymax = this.img_.height;
+        }
+        rect.set('left', Math.floor(obj.bndbox.xmin * this.scale_));
+        rect.set('top', Math.floor(obj.bndbox.ymin * this.scale_));
+        rect.set('width', Math.floor((obj.bndbox.xmax - obj.bndbox.xmin) * this.scale_));
+        rect.set('height', Math.floor((obj.bndbox.ymax - obj.bndbox.ymin) * this.scale_));
+        const text = rect._lblText;
+        text.left = rect.left + TEXT_OFFSET;
+        text.top = rect.top + TEXT_OFFSET;
+        this.canvas_.requestRenderAll();
+        this.save();
     }
 };
 
@@ -651,11 +879,14 @@ label.App.directive('labelImg', function() {
     let ctl;
 
     const tpl = `
-<canvas></canvas>`;
+<canvas></canvas>
+<label-img-tb label-img-ctl="c"></label-img-tb>`;
 
     return {
         restrict: 'E',
-        scope: {},
+        scope: {
+            'link': '<'
+        },
         template: tpl,
         controller: label.LabelImgController,
         controllerAs: 'c'
@@ -688,62 +919,43 @@ label.SelectObjController.prototype.close = function() {
  */
 label.ToolbarController = function($element) {
     draggable.makeDraggable($element[0]);
-    this.canZoomIn_ = function() {
-        return label.labelImg_ && label.labelImg_.canZoomIn_;
-    };
-    this.canZoomOut_ = function() {
-        return label.labelImg_ && label.labelImg_.canZoomOut_;
-    };
-    this.delete_ = function() {
-        if (label.labelImg_.activeObj_) {
-            label.labelImg_.delObj_(label.labelImg_.activeObj_);
-        }
-    };
-    this.edit_ = function() {
-        if (label.labelImg_.activeObj_) {
-            label.labelImg_.tryChangeObj_(label.labelImg_.activeObj_);
-        }
-    };
-    this.hasActive_ = function() {
-        return label.labelImg_ && label.labelImg_.activeObj_;
-    };
-    this.zoomIn_ = function(scale) {
-        label.labelImg_.zoomIn_(scale);
-    };
-    this.zoomOut_ = function(scale) {
-        label.labelImg_.zoomOut_(scale);
-    };
 };
 
 label.App.directive('labelImgTb', function() {
-    /** @type {!label.ToolbarController} */
+    /** @type {!label.LabelImgController} */
     let ctl;
 
+    const activeObj = goog.reflect.objectProperty('activeObj_', ctl);
     const canZoomIn = goog.reflect.objectProperty('canZoomIn_', ctl);
     const canZoomOut = goog.reflect.objectProperty('canZoomOut_', ctl);
-    const del = goog.reflect.objectProperty('delete_', ctl);
-    const edit = goog.reflect.objectProperty('edit_', ctl);
-    const hasActive = goog.reflect.objectProperty('hasActive_', ctl);
+    const delObj = goog.reflect.objectProperty('delObj_', ctl);
+    const tryChangeObj = goog.reflect.objectProperty('tryChangeObj_', ctl);
     const zoomIn = goog.reflect.objectProperty('zoomIn_', ctl);
     const zoomOut = goog.reflect.objectProperty('zoomOut_', ctl);
 
     const tpl = `
-<a role="button" class="btn btn-sm" ng-click="c.${zoomIn}(1.2)" ng-disabled="!c.${canZoomIn}()">
+<a role="button" class="btn btn-sm" ng-click="labelImgCtl.${zoomIn}(1.2)"
+                 ng-disabled="!labelImgCtl.${canZoomIn}">
     <i class="fa fa-search-plus"></i>
 </a>
-<a role="button" class="btn btn-sm" ng-click="c.${zoomOut}(0.8)" ng-disabled="!c.${canZoomOut}()">
+<a role="button" class="btn btn-sm" ng-click="labelImgCtl.${zoomOut}(0.8)"
+                 ng-disabled="!labelImgCtl.${canZoomOut}">
     <i class="fa fa-search-minus"></i>
 </a>
-<a role="button" class="btn btn-sm" ng-click="c.${del}()" ng-disabled="!c.${hasActive}()">
+<a role="button" class="btn btn-sm" ng-click="labelImgCtl.${delObj}(labelImgCtl.${activeObj})"
+                 ng-disabled="!labelImgCtl.${activeObj}">
     <i class="fa fa-trash"></i>
 </a>
-<a role="button" class="btn btn-sm" ng-click="c.${edit}()" ng-disabled="!c.${hasActive}()">
+<a role="button" class="btn btn-sm" ng-click="labelImgCtl.${tryChangeObj}(labelImgCtl.${activeObj})"
+                 ng-disabled="!labelImgCtl.${activeObj}">
     <i class="fa fa-edit"></i>
 </a>`;
 
     return {
         restrict: 'E',
-        scope: {},
+        scope: {
+            'labelImgCtl': '<'
+        },
         template: tpl,
         controller: label.ToolbarController,
         controllerAs: 'c',

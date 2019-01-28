@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
     <head>
-        <title>Camect</title>
+        <title>Label Anywhere</title>
         <meta name=viewport content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'>
         <link href="css/bootstrap-3.3.7.min.css" type="text/css" rel="stylesheet">
         <link href="css/font-awesome-4.6.2.css" type="text/css" rel="stylesheet">
@@ -14,12 +14,12 @@
     <body ng-app="labelApp" ng-controller="labelCtrl">
         <div class="container-fluid">
             <div class="split-view" id="list">
-                <img-dir parent="''" name="'/'" is-collapsed="false"></img-dir>
+                <img-dir parent="''" name="'/'" is-collapsed="false" link="imgDirCreated">
+                </img-dir>
             </div>
             <div class="splitter"></div>
             <div class="split-view" id="image">
-                <label-img></label-img>
-                <label-img-tb></label-img-tb>
+                <label-img link="labelImgCreated"></label-img>
             </div>
         </div>
     </body>
