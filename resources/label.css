@@ -1,3 +1,7 @@
+@viewport {
+    orientation: landscape;
+}
+
 html,
 body,
 .container-fluid {
@@ -81,6 +85,7 @@ label-img-tb > .btn {
     flex: 1 1 auto;
     display: flex;
     flex-flow: column;
+    min-height: 280px !important;
     max-height: calc(100% - 150px);
     overflow-y: auto;
     overflow-x: hidden;
