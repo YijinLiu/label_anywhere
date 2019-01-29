@@ -44,11 +44,11 @@ body,
     width: calc(30% - 2px);
 }
 
-#list .name {
+.name {
     text-overflow: ellipsis;
 }
 
-#list .name.editing {
+.name.active {
     font-weight: bold;
 }
 

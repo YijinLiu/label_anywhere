@@ -10,8 +10,9 @@ goog.require('draggable');
 const MIN_OBJ_SIZE = 30;
 const MIN_CANVAS_SIZE = 300;
 const TEXT_OFFSET = 1;
-const MIN_OBJ_MOVE = 1;
-const CONTROL_SIZE = 8;
+const SMALL_MOVE_STEP = 1;
+const BIG_MOVE_STEP = 5;
+const CONTROL_SIZE = 6;
 const RECT_FILL_COLOR = 'beige';
 const RECT_BORDER_COLOR = 'bisque';
 const TEXT_COLOR = 'palegreen';
@@ -97,13 +98,14 @@ function scrollIntoViewIfNeeded(el) {
  * @param {!Element} el
  */
 label.Controller.prototype.openImg_ = function(ctl, i, el) {
+    this.labelImgCtl_.saveTmpObj_();
     const item = ctl.content_.items[i];
     if (item.isDir) return;
     this.curImgDirCtl_ = ctl;
     this.curImgIndex_ = i;
-    if (this.curImgEl_) this.curImgEl_.classList.remove('editing');
+    if (this.curImgEl_) this.curImgEl_.classList.remove('active');
     this.curImgEl_ = el;
-    el.classList.add('editing');
+    el.classList.add('active');
     scrollIntoViewIfNeeded(el);
     this.labelImgCtl_.open(ctl.content_.path, item);
 };
@@ -135,7 +137,6 @@ label.Controller.prototype.labelImgCreated_ = function(ctl) {
  */
 label.Controller.prototype.onKeyDown_ = function(evt) {
     const ke = /** @type {KeyboardEvent} */ (evt);
-    console.log(ke.key);
     if (ke.key == 'PageDown') {
         this.nextImg_();
         evt.preventDefault();
@@ -152,52 +153,60 @@ label.Controller.prototype.onKeyDown_ = function(evt) {
         }
     } else if (ke.key == 'ArrowUp') {
         if (this.labelImgCtl_.activeObj_) {
+            const step = ke.repeat ? BIG_MOVE_STEP : SMALL_MOVE_STEP;
             if (ke.ctrlKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, -MIN_OBJ_MOVE, 0, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, -step, 0, 0);
             } else if (ke.shiftKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 0, -MIN_OBJ_MOVE);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 0, -step);
             } else {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, -MIN_OBJ_MOVE, 0, -MIN_OBJ_MOVE);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, -step, 0, -step);
             }
             evt.preventDefault();
             evt.stopPropagation();
         }
     } else if (ke.key == 'ArrowDown') {
         if (this.labelImgCtl_.activeObj_) {
+            const step = ke.repeat ? BIG_MOVE_STEP : SMALL_MOVE_STEP;
             if (ke.ctrlKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 0, MIN_OBJ_MOVE);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, 0, step);
             } else if (ke.shiftKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, MIN_OBJ_MOVE, 0, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, step, 0, 0);
             } else {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, MIN_OBJ_MOVE, 0, MIN_OBJ_MOVE);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, step, 0, step);
             }
             evt.preventDefault();
             evt.stopPropagation();
         }
     } else if (ke.key == 'ArrowLeft') {
         if (this.labelImgCtl_.activeObj_) {
+            const step = ke.repeat ? BIG_MOVE_STEP : SMALL_MOVE_STEP;
             if (ke.ctrlKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, -MIN_OBJ_MOVE, 0, 0, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, -step, 0, 0, 0);
             } else if (ke.shiftKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, -MIN_OBJ_MOVE, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, -step, 0);
             } else {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, -MIN_OBJ_MOVE, 0, -MIN_OBJ_MOVE, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, -step, 0, -step, 0);
             }
             evt.preventDefault();
             evt.stopPropagation();
         }
     } else if (ke.key == 'ArrowRight') {
         if (this.labelImgCtl_.activeObj_) {
+            const step = ke.repeat ? BIG_MOVE_STEP : SMALL_MOVE_STEP;
             if (ke.ctrlKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, MIN_OBJ_MOVE, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, 0, 0, step, 0);
             } else if (ke.shiftKey) {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, MIN_OBJ_MOVE, 0, 0, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, step, 0, 0, 0);
             } else {
-                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, MIN_OBJ_MOVE, 0, MIN_OBJ_MOVE, 0);
+                this.labelImgCtl_.moveObj_(this.labelImgCtl_.activeObj_, step, 0, step, 0);
             }
             evt.preventDefault();
             evt.stopPropagation();
         }
+    } else if (ke.key == ' ') {
+        this.labelImgCtl_.addDefObj_();
+        evt.preventDefault();
+        evt.stopPropagation();
     }
 };
 
@@ -357,6 +366,7 @@ label.App.directive('imgDir', function() {
         <i class="fa" ng-class="{'fa-caret-right': isCollapsed, 'fa-caret-down': !isCollapsed}">
         </i>
     </a><span class="name">{{name}}</span>
+    <span ng-if="c.${content}">({{c.${content}.items ? c.${content}.items.length : 0}})</span>
     <a role="button" class="btn btn-sm" ng-click="c.${reload}(true)"
                      ng-disabled="c.${reloading}">
         <i class="fa fa-refresh fa-fw" ng-class="{'fa-spin' : c.${reloading}}"></i>
@@ -433,9 +443,15 @@ label.LabelImgController = function($scope, $route, $http, $element, $uibModal) 
 
     /** @type {fabric.Object} */
     this.activeObj_;
+    /** @type {Obj} */
+    this.tmpObj_;
+    /** @type {Obj} */
+    this.defObj_;
     this.isDrawing_ = false;
     /** @type {fabric.Point} */
     this.drawingStartPt_;
+    /** @type {!ui.bootstrap.modalInstance} */
+    this.modalInst_;
     this.objNames_ = ['person'];
 	this.listObjs_();
 
@@ -466,9 +482,19 @@ label.LabelImgController.prototype.save = function() {
     this.http_.post(url, JSON.stringify(this.ann_)).then(
         this.saveDone_.bind(this), this.saveFailed_.bind(this));
     this.item_.objects = [];
-    for (let i = 0; i < this.ann_.objects.length; i++) {
-        const name = this.ann_.objects[i].name;
-        if (this.item_.objects.indexOf(name) < 0) this.item_.objects.push(name);
+    if (this.ann_.objects.length > 0) {
+        for (let i = 0; i < this.ann_.objects.length; i++) {
+            const name = this.ann_.objects[i].name;
+            if (this.item_.objects.indexOf(name) < 0) this.item_.objects.push(name);
+        }
+        const obj = this.ann_.objects[0]
+        this.defObj_ = /** @type {!Obj} */ ({});
+        this.defObj_.name = obj.name
+        this.defObj_.bndbox = /** @type {!BoundingBox} */ ({});
+        this.defObj_.bndbox.xmin = obj.bndbox.xmin / this.img_.width;
+        this.defObj_.bndbox.ymin = obj.bndbox.ymin / this.img_.height;
+        this.defObj_.bndbox.xmax = obj.bndbox.xmax / this.img_.width;
+        this.defObj_.bndbox.ymax = obj.bndbox.ymax / this.img_.height;
     }
 };
 
@@ -483,6 +509,35 @@ label.LabelImgController.prototype.saveDone_ = function(resp) {
  */
 label.LabelImgController.prototype.saveFailed_ = function(resp) {
     console.log('Failed to save!');
+};
+
+label.LabelImgController.prototype.saveTmpObj_ = function() {
+    if (this.tmpObj_) {
+        this.modalInst_.close();
+        this.addObj_(this.objNames_[0]);
+        this.tmpObj_ = null;
+    }
+};
+
+label.LabelImgController.prototype.addDefObj_ = function() {
+    if (!this.img_) return;
+    this.tmpObj_ = /** @type {!Obj} */ ({});
+    this.tmpObj_.bndbox = /** @type {!BoundingBox} */ ({});
+    let name;
+    if (!this.defObj_) {
+        name = this.objNames_[0];
+        this.tmpObj_.bndbox.xmin = Math.floor(this.img_.width / 4);
+        this.tmpObj_.bndbox.ymin = Math.floor(this.img_.height / 4);
+        this.tmpObj_.bndbox.xmax = Math.floor(this.img_.width * 3 / 4);
+        this.tmpObj_.bndbox.ymax = Math.floor(this.img_.height * 3 / 4);
+    } else {
+        name = this.defObj_.name;
+        this.tmpObj_.bndbox.xmin = Math.floor(this.defObj_.bndbox.xmin * this.img_.width);
+        this.tmpObj_.bndbox.ymin = Math.floor(this.defObj_.bndbox.ymin * this.img_.height);
+        this.tmpObj_.bndbox.xmax = Math.floor(this.defObj_.bndbox.xmax * this.img_.width);
+        this.tmpObj_.bndbox.ymax = Math.floor(this.defObj_.bndbox.ymax * this.img_.height);
+    }
+    this.addObj_(name);
 };
 
 /**
@@ -525,13 +580,13 @@ label.LabelImgController.prototype.onMouseUp_ = function(opt) {
     if (width >= MIN_OBJ_SIZE && height >= MIN_OBJ_SIZE) {
         const left = Math.floor(Math.min(opt.pointer.x, this.drawingStartPt_.x) / this.scale_);
         const top = Math.floor(Math.min(opt.pointer.y, this.drawingStartPt_.y) / this.scale_);
-        const obj = /** @type {!Obj} */ ({});
-        obj.bndbox = /** @type {!BoundingBox} */ ({});
-        obj.bndbox.xmin = left;
-        obj.bndbox.ymin = top;
-        obj.bndbox.xmax = left + width;
-        obj.bndbox.ymax = top + height;
-        this.selectObjName_(this.addObj_.bind(this, obj));
+        this.tmpObj_ = /** @type {!Obj} */ ({});
+        this.tmpObj_.bndbox = /** @type {!BoundingBox} */ ({});
+        this.tmpObj_.bndbox.xmin = left;
+        this.tmpObj_.bndbox.ymin = top;
+        this.tmpObj_.bndbox.xmax = left + width;
+        this.tmpObj_.bndbox.ymax = top + height;
+        this.selectObjName_(this.addObj_.bind(this));
     }
     opt.e.preventDefault();
     opt.e.stopPropagation();
@@ -659,7 +714,7 @@ label.LabelImgController.prototype.scaleCanvas_ = function(scale) {
 label.LabelImgController.prototype.updateZooming_ = function() {
     this.canZoomIn_ = !!this.img_ && this.canvas_.width < this.width_ &&
         this.canvas_.height < this.height_;
-    this.canZoomOut_ = !!this.img_ && 
+    this.canZoomOut_ = !!this.img_ &&
         this.canvas_.width > Math.min(this.img_.width, MIN_CANVAS_SIZE) &&
         this.canvas_.height > Math.min(this.img_.height, MIN_CANVAS_SIZE);
     this.route_.reload();
@@ -719,8 +774,8 @@ label.LabelImgController.prototype.selectObjName_ = function(cb) {
     let ctl;
 
     const close = goog.reflect.objectProperty('close', ctl);
-    const done = goog.reflect.objectProperty('done_', ctl);
     const names = goog.reflect.objectProperty('names_', ctl);
+    const ok = goog.reflect.objectProperty('ok', ctl);
 
     const tpl = `
 <div class="modal-header">
@@ -735,20 +790,24 @@ label.LabelImgController.prototype.selectObjName_ = function(cb) {
             <i class="form-control-feedback fa fa-search"></i>
         </div></li>
 		<li ng-repeat="name in names = (c.${names}|filter:search:strict)">
-			<a href="#" ng-click="$event.preventDefault(); c.${done}(name); c.${close}()">
+			<a href="#" ng-click="$event.preventDefault(); c.${ok}(name)"
+                        class="name" ng-class="{'active': $index == 0}">
                 {{name}}
             </a>
 		</li>
 	</ul>
 </div>
 <div class="modal-footer">
+	<button class="btn btn-primary" type="button" ng-click="c.${ok}()" autofocus>
+		OK
+	</button>
 	<button class="btn btn-warning" type="button" ng-click="c.${close}()">
 		Cancel
 	</button>
 </div>`;
 
     const me = this;
-    this.modal_.open({
+    this.modalInst_ = this.modal_.open({
         animation: true,
         template: tpl,
         controller: label.SelectObjController,
@@ -774,17 +833,17 @@ label.LabelImgController.prototype.prioritizeObjName_ = function(name) {
 };
 
 /**
- * @param {!Obj} obj
  * @param {!string} name
  */
-label.LabelImgController.prototype.addObj_ = function(obj, name) {
-    if (this.ann_) {
-        obj.name = name;
-        this.ann_.objects.push(obj);
-        this.renderObj_(obj);
+label.LabelImgController.prototype.addObj_ = function(name) {
+    if (this.ann_ && this.tmpObj_ && name) {
+        this.tmpObj_.name = name;
+        this.ann_.objects.push(this.tmpObj_);
+        this.renderObj_(this.tmpObj_);
         this.save();
     }
-    this.prioritizeObjName_(name);
+    this.tmpObj_ = null;
+    if (name) this.prioritizeObjName_(name);
 };
 
 /**
@@ -917,7 +976,17 @@ label.SelectObjController = function($scope, $uibModalInstance, names, done) {
     this.done_ = done;
 };
 
+/**
+ * @param {string} name
+ */
+label.SelectObjController.prototype.ok = function(name) {
+    if (!name) name = this.names_[0];
+    this.done_(name);
+    this.modalInst_.close();
+};
+
 label.SelectObjController.prototype.close = function() {
+    this.done_('');
     this.modalInst_.close();
 };
 
