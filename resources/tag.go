@@ -1,2 +1,2 @@
 package resources
-const Tag = "74519228aaa943470ea2ad11b4384dca"
+const Tag = "697a7062157adbc02359c9cfc04e1797"

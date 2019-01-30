@@ -62,7 +62,7 @@ label.Controller = function($scope) {
     this.imgDirCtls_ = [];
     /** @type {label.ImgDirController} */
     this.curImgDirCtl_;
-    this.curImgIndex_ = -1;
+    this.curImgName_ = '';
     /** @type {Element} */
     this.curImgEl_;
     $scope['imgDirCreated'] = this.imgDirCreated_.bind(this);
@@ -79,6 +79,7 @@ label.Controller.prototype.imgDirCreated_ = function(ctl) {
     this.imgDirCtls_.push(ctl);
     const me = this;
     ctl.openImgCb_ = this.openImg_.bind(this);
+    ctl.beforeDelCb_ = this.beforeDel_.bind(this);
 };
 
 /**
@@ -102,7 +103,7 @@ label.Controller.prototype.openImg_ = function(ctl, i, el) {
     const item = ctl.content_.items[i];
     if (item.isDir) return;
     this.curImgDirCtl_ = ctl;
-    this.curImgIndex_ = i;
+    this.curImgName_ = item.name;
     if (this.curImgEl_) this.curImgEl_.classList.remove('active');
     this.curImgEl_ = el;
     el.classList.add('active');
@@ -112,16 +113,31 @@ label.Controller.prototype.openImg_ = function(ctl, i, el) {
 
 label.Controller.prototype.nextImg_ = function() {
     if (!this.curImgDirCtl_) return;
-    const i = this.curImgIndex_ + 1;
+    const i = this.curImgDirCtl_.indexOf_(this.curImgName_) + 1;
     if (i >= this.curImgDirCtl_.content_.items.length) return;
     this.openImg_(this.curImgDirCtl_, i, this.curImgDirCtl_.nthItemEl_(i));
 };
 
 label.Controller.prototype.prevImg_ = function() {
     if (!this.curImgDirCtl_) return;
-    const i = this.curImgIndex_ - 1;
+    const i = this.curImgDirCtl_.indexOf_(this.curImgName_) - 1;
     if (i < 0) return;
     this.openImg_(this.curImgDirCtl_, i, this.curImgDirCtl_.nthItemEl_(i));
+};
+
+/**
+ * @param {!label.ImgDirController} ctl
+ * @param {!string} name
+ */
+label.Controller.prototype.beforeDel_ = function(ctl, name) {
+    if (this.curImgDirCtl_ == ctl && this.curImgName_ == name) {
+        const i = ctl.indexOf_(name);
+        if (i < this.curImgDirCtl_.content_.items.length - 1) {
+            this.openImg_(this.curImgDirCtl_, i + 1, this.curImgDirCtl_.nthItemEl_(i + 1));
+        } else if (i > 0) {
+            this.openImg_(this.curImgDirCtl_, i - 1, this.curImgDirCtl_.nthItemEl_(i - 1));
+        }
+    }
 };
 
 /**
@@ -207,6 +223,12 @@ label.Controller.prototype.onKeyDown_ = function(evt) {
         this.labelImgCtl_.addDefObj_();
         evt.preventDefault();
         evt.stopPropagation();
+    } else if (ke.key == 'Enter') {
+        if (this.labelImgCtl_.activeObj_) {
+            this.labelImgCtl_.tryChangeObj_(this.labelImgCtl_.activeObj_);
+            evt.preventDefault();
+            evt.stopPropagation();
+        }
     }
 };
 
@@ -264,6 +286,8 @@ label.ImgDirController = function($scope, $route, $http, $element) {
 
     /** @type {!function(!label.ImgDirController, !number, !Element)} */
     this.openImgCb_;
+    /** @type {!function(!label.ImgDirController, !string)} */
+    this.beforeDelCb_;
     const link = $scope['link'];
     if (link) link(this);
 };
@@ -319,10 +343,19 @@ label.ImgDirController.prototype.open_ = function(i, el) {
     this.openImgCb_(this, i, el);
 };
 
+label.ImgDirController.prototype.indexOf_ = function(name) {
+    if (!this.content_ || !this.content_.items) return -1;
+    for (let i = 0; i < this.content_.items.length; i++) {
+        if (this.content_.items[i].name == name) return i;
+    }
+    return -1;
+};
+
 /**
  * @param {!string} name
  */
 label.ImgDirController.prototype.del_ = function(name) {
+    this.beforeDelCb_(this, name);
     const url = goog.string.format('del_img?parent=%s&name=%s',
                                    encodeURIComponent(this.content_.path),
                                    encodeURIComponent(name));
@@ -664,7 +697,7 @@ label.LabelImgController.prototype.renderObj_ = function(obj) {
     });
     rect.cornerSize = CONTROL_SIZE;
     rect.fill = RECT_FILL_COLOR;
-    rect.opacity = 0.4;
+    rect.opacity = 0.3;
     rect.hasRotatingPoint = false;
     rect.stroke = RECT_BORDER_COLOR;
     rect.strokeWidth = 2;

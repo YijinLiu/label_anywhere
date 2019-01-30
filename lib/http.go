@@ -105,8 +105,7 @@ func (h *Handler) DelImage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := delFile(annotationXmlFile(p)); err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
-			return
+			logging.Vlog(0, err)
 		}
 		h.removeFromCache(r.FormValue("parent"), r.FormValue("name"))
 	}
@@ -168,7 +167,7 @@ func (h *Handler) PostAnnotation(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 			}
 			h.updateCache(r.FormValue("parent"), r.FormValue("name"), nil)
-		} else if xmlData, err := xml.Marshal(&ann); err != nil {
+		} else if xmlData, err := xml.MarshalIndent(&ann, "", "\t"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		} else if err := ioutil.WriteFile(xmlFile, xmlData, 0600); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -303,7 +302,14 @@ func readAnnotationXmlFile(xmlFile string) (*Annotation, error) {
 }
 
 func delFile(file string) error {
-	return os.Rename(file, file+".deleted")
+	if filepath.Ext(file) == ".xml" || filepath.Base(filepath.Dir(file)) == "deleted" {
+		return os.Remove(file)
+	}
+	deletedDir := filepath.Join(filepath.Dir(file), "deleted")
+	if err := os.Mkdir(deletedDir, 0700); err != nil && !os.IsExist(err) {
+		return err
+	}
+	return os.Rename(file, filepath.Join(deletedDir, filepath.Base(file)))
 }
 
 func isImageFile(name string) bool {
