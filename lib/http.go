@@ -3,10 +3,6 @@ package lib
 import (
 	"encoding/json"
 	"encoding/xml"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -117,21 +113,8 @@ func (h *Handler) GetAnnotation(w http.ResponseWriter, r *http.Request) {
 		var err error
 		if ann, err = readAnnotationXmlFile(annotationXmlFile(p)); err != nil {
 			if os.IsNotExist(err) {
-				var f *os.File
-				if f, err = os.Open(p); err == nil {
-					defer f.Close()
-					var img image.Image
-					if img, _, err = image.Decode(f); err == nil {
-						ann = &Annotation{}
-						ann.Filename = filepath.Base(p)
-						rect := img.Bounds()
-						ann.Size = &ImageSize{
-							Width:  uint32(rect.Max.X - rect.Min.X),
-							Height: uint32(rect.Max.Y - rect.Min.Y),
-							Depth:  3, // assume it's 3
-						}
-					}
-				}
+				http.Error(w, "not found", http.StatusNotFound)
+				return
 			}
 		}
 		if err != nil {

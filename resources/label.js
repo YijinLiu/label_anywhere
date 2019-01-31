@@ -672,9 +672,17 @@ label.LabelImgController.prototype.onLoad_ = function(img) {
  * @param {angular.$http.Response} resp
  */
 label.LabelImgController.prototype.gotAnn_ = function(resp) {
-    this.ann_ = resp.data;
-    if (!this.ann_.objects) this.ann_.objects = [];
-    this.renderAnn_();
+    const ann = /** @type {Annotation} */ (resp.data);
+    if (ann.filename != this.item_.name) {
+        console.log('Invalid annotation: expecting %s, got %s', this.item_.name, ann.filename);
+        return;
+    }
+    this.ann_ = ann;
+    if (!this.ann_.objects) {
+        this.ann_.objects = [];
+    } else {
+        this.renderAnn_();
+    }
 };
 
 label.LabelImgController.prototype.renderAnn_ = function() {
@@ -723,7 +731,14 @@ label.LabelImgController.prototype.renderObj_ = function(obj) {
  * @param {angular.$http.Response} resp
  */
 label.LabelImgController.prototype.getAnnFailed_ = function(resp) {
-    alert(goog.string.format('Failed to load annotation for "%s"!', this.item_.name));
+    console.log('Failed to load annotation for "%s"!', this.item_.name);
+    this.ann_ = /** @type {!Annotation} */ ({});
+    this.ann_.filename = this.item_.name;
+    this.ann_.size = /** @type {!ImageSize} */ ({});
+    this.ann_.size.width = this.img_.width;
+    this.ann_.size.height = this.img_.height;
+    this.ann_.size.depth = 3;  // assume it's 3
+    this.ann_.objects = [];
 };
 
 /**
