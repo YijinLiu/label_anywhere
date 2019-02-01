@@ -607,7 +607,7 @@ label.LabelImgController.prototype.onMouseUp_ = function(opt) {
     this.activeObj_ = opt.target;
     this.isDrawing_ = false;
     this.route_.reload();
-    if (opt.target || opt.isClick || !this.drawingStartPt_ || !this.ann_) return;
+    if (opt.isClick || !this.drawingStartPt_ || !this.ann_) return;
     const width = Math.floor(Math.abs(opt.pointer.x - this.drawingStartPt_.x) / this.scale_);
     const height = Math.floor(Math.abs(opt.pointer.y - this.drawingStartPt_.y) / this.scale_);
     if (width >= MIN_OBJ_SIZE && height >= MIN_OBJ_SIZE) {
@@ -665,13 +665,16 @@ label.LabelImgController.prototype.onLoad_ = function(img) {
     this.scaleCanvas_(scale);
     const url = goog.string.format('get_ann?parent=%s&name=%s', encodeURIComponent(this.parent_),
                                    encodeURIComponent(this.item_.name));
-    this.http_.get(url).then(this.gotAnn_.bind(this), this.getAnnFailed_.bind(this));
+    this.http_.get(url).then(this.gotAnn_.bind(this, this.img_),
+                             this.getAnnFailed_.bind(this, this.img_));
 };
 
 /**
+ * @param {!fabric.Image} img
  * @param {angular.$http.Response} resp
  */
-label.LabelImgController.prototype.gotAnn_ = function(resp) {
+label.LabelImgController.prototype.gotAnn_ = function(img, resp) {
+    if (this.img_ != img) return;
     const ann = /** @type {Annotation} */ (resp.data);
     if (ann.filename != this.item_.name) {
         console.log('Invalid annotation: expecting %s, got %s', this.item_.name, ann.filename);
@@ -728,15 +731,17 @@ label.LabelImgController.prototype.renderObj_ = function(obj) {
 };
 
 /**
+ * @param {!fabric.Image} img
  * @param {angular.$http.Response} resp
  */
-label.LabelImgController.prototype.getAnnFailed_ = function(resp) {
+label.LabelImgController.prototype.getAnnFailed_ = function(img, resp) {
+    if (this.img_ != img) return;
     console.log('Failed to load annotation for "%s"!', this.item_.name);
     this.ann_ = /** @type {!Annotation} */ ({});
     this.ann_.filename = this.item_.name;
     this.ann_.size = /** @type {!ImageSize} */ ({});
-    this.ann_.size.width = this.img_.width;
-    this.ann_.size.height = this.img_.height;
+    this.ann_.size.width = img.width;
+    this.ann_.size.height = img.height;
     this.ann_.size.depth = 3;  // assume it's 3
     this.ann_.objects = [];
 };
