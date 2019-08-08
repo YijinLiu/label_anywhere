@@ -25,3 +25,7 @@ license plate
 honda
 subaru
 acura
+deer
+fly
+spider
+fox

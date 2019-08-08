@@ -7,7 +7,7 @@ goog.require('goog.string.format');
 
 goog.require('draggable');
 
-const MIN_OBJ_SIZE = 30;
+const MIN_OBJ_SIZE = 10;
 const MIN_CANVAS_SIZE = 300;
 const TEXT_OFFSET = 1;
 const SMALL_MOVE_STEP = 1;
@@ -952,38 +952,31 @@ label.LabelImgController.prototype.delObj_ = function(rect) {
 label.LabelImgController.prototype.moveObj_ = function(rect, xminD, yminD, xmaxD, ymaxD) {
     if (this.ann_) {
         const obj = rect._lblJson;
+
         obj.bndbox.xmin += xminD;
-        if (obj.bndbox.xmin < 0) {
-            obj.bndbox.xmin = 0;
-        } else if (obj.bndbox.xmin > this.img_.width - MIN_OBJ_SIZE) {
+        if (obj.bndbox.xmin > this.img_.width - MIN_OBJ_SIZE) {
             obj.bndbox.xmin = this.img_.width - MIN_OBJ_SIZE;
         }
+        if (obj.bndbox.xmin < 0) obj.bndbox.xmin = 0;
+
         obj.bndbox.ymin += yminD;
-        if (obj.bndbox.ymin < 0) {
-            obj.bndbox.ymin = 0;
-        } else if (obj.bndbox.ymin > this.img_.height - MIN_OBJ_SIZE) {
+        if (obj.bndbox.ymin > this.img_.height - MIN_OBJ_SIZE) {
             obj.bndbox.ymin = this.img_.height - MIN_OBJ_SIZE;
         }
+        if (obj.bndbox.ymin < 0) obj.bndbox.ymin = 0;
+
         obj.bndbox.xmax += xmaxD;
         if (obj.bndbox.xmax < obj.bndbox.xmin + MIN_OBJ_SIZE) {
             obj.bndbox.xmax = obj.bndbox.xmin + MIN_OBJ_SIZE;
-            if (obj.bndbox.xmax > this.img_.width) {
-                obj.bndbox.xmax = this.img_.width;
-                obj.bndbox.xmin = obj.bndbox.xmax - MIN_OBJ_SIZE;
-            }
-        } else if (obj.bndbox.xmax > this.img_.width) {
-            obj.bndbox.xmax = this.img_.width;
         }
+        if (obj.bndbox.xmax > this.img_.width) obj.bndbox.xmax = this.img_.width;
+
         obj.bndbox.ymax += ymaxD;
         if (obj.bndbox.ymax < obj.bndbox.ymin + MIN_OBJ_SIZE) {
             obj.bndbox.ymax = obj.bndbox.ymin + MIN_OBJ_SIZE;
-            if (obj.bndbox.ymax > this.img_.height) {
-                obj.bndbox.ymax = this.img_.height;
-                obj.bndbox.ymin = obj.bndbox.ymax - MIN_OBJ_SIZE;
-            }
-        } else if (obj.bndbox.ymax > this.img_.height) {
-            obj.bndbox.ymax = this.img_.height;
         }
+        if (obj.bndbox.ymax > this.img_.height) obj.bndbox.ymax = this.img_.height;
+
         rect.set('left', Math.floor(obj.bndbox.xmin * this.scale_));
         rect.set('top', Math.floor(obj.bndbox.ymin * this.scale_));
         rect.set('width', Math.floor((obj.bndbox.xmax - obj.bndbox.xmin) * this.scale_));
